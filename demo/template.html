@@ -1,0 +1,1790 @@
+<title>Turbine Shadow Census</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+:root {
+  --ground: #E9EEF1;
+  --panel: #FFFFFF;
+  --panel-2: #F3F7FA;
+  --sunk: #DDE6EB;
+  --line: #C8D5DD;
+  --line-soft: #E0E9ED;
+  --ink: #0E1519;
+  --ink-2: #495965;
+  --ink-3: #74868F;
+  --ember: #C2511A;
+  --ember-ink: #A8430F;
+  --ember-wash: rgba(194, 81, 26, .10);
+  --sky: #226F8C;
+  --good: #2C7A59;
+  --panel-shadow: 0 1px 2px rgba(14, 21, 25, .05), 0 14px 30px -20px rgba(14, 21, 25, .35);
+  --grid-line: rgba(14, 21, 25, .07);
+  --scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0A1014;
+    --panel: #121A20;
+    --panel-2: #18232B;
+    --sunk: #070D11;
+    --line: #26343E;
+    --line-soft: #1A252D;
+    --ink: #E8EFF3;
+    --ink-2: #A2B3BF;
+    --ink-3: #6E8290;
+    --ember: #FF8542;
+    --ember-ink: #FFA070;
+    --ember-wash: rgba(255, 133, 66, .14);
+    --sky: #57B6D8;
+    --good: #4FBE8E;
+    --panel-shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 18px 34px -24px rgba(0, 0, 0, .9);
+    --grid-line: rgba(232, 239, 243, .08);
+    --scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0A1014;
+  --panel: #121A20;
+  --panel-2: #18232B;
+  --sunk: #070D11;
+  --line: #26343E;
+  --line-soft: #1A252D;
+  --ink: #E8EFF3;
+  --ink-2: #A2B3BF;
+  --ink-3: #6E8290;
+  --ember: #FF8542;
+  --ember-ink: #FFA070;
+  --ember-wash: rgba(255, 133, 66, .14);
+  --sky: #57B6D8;
+  --good: #4FBE8E;
+  --panel-shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 18px 34px -24px rgba(0, 0, 0, .9);
+  --grid-line: rgba(232, 239, 243, .08);
+  --scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  font-weight: 600;
+  letter-spacing: -.015em;
+  text-wrap: balance;
+  margin: 0;
+}
+
+.mono, .num {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+a { color: var(--ember-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.wrap {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 0 clamp(14px, 3vw, 34px);
+}
+
+/* ---------------- masthead ---------------- */
+
+.masthead {
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.masthead .wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 22px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand h1 { font-size: 19px; }
+.brand .tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-3);
+  border-left: 1px solid var(--line);
+  padding-left: 10px;
+}
+.masthead .spacer { flex: 1 1 40px; }
+
+.readout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+}
+.readout .cell { display: flex; flex-direction: column; gap: 1px; }
+.readout .val {
+  font-family: Archivo, sans-serif;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.readout .val.hit { color: var(--ember-ink); }
+.readout .lab {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.ghost {
+  font: 500 12px "IBM Plex Mono", monospace;
+  color: var(--ink-2);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 11px;
+  cursor: pointer;
+}
+.ghost:hover { border-color: var(--ink-3); color: var(--ink); }
+
+/* ---------------- console ---------------- */
+
+.console {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 344px;
+  gap: 16px;
+  padding: 16px 0 8px;
+  align-items: start;
+}
+@media (max-width: 1080px) {
+  .console { grid-template-columns: minmax(0, 1fr); }
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--panel-shadow);
+}
+
+.stage { position: relative; overflow: hidden; }
+#view {
+  display: block;
+  width: 100%;
+  height: clamp(380px, 66vh, 700px);
+  background: var(--sunk);
+  cursor: crosshair;
+  touch-action: none;
+  border-radius: 9px;
+}
+#view.dragging { cursor: grabbing; }
+
+.hud {
+  position: absolute;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  pointer-events: none;
+}
+.hud.tl { top: 10px; left: 10px; flex-direction: column; align-items: flex-start; }
+.hud.tr { top: 10px; right: 10px; pointer-events: auto; }
+.hud.bl { bottom: 10px; left: 10px; flex-direction: column; align-items: flex-start; }
+.hud.br { bottom: 10px; right: 10px; }
+
+.chip {
+  font: 500 11px "IBM Plex Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.chip .k { color: var(--ink-3); }
+.chip.wide { display: grid; grid-template-columns: auto auto; gap: 1px 10px; }
+
+.segmented { display: flex; pointer-events: auto; }
+.segmented button {
+  font: 500 11px "IBM Plex Mono", monospace;
+  letter-spacing: .04em;
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--line);
+  border-right-width: 0;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.segmented button:first-child { border-radius: 5px 0 0 5px; }
+.segmented button:last-child { border-radius: 0 5px 5px 0; border-right-width: 1px; }
+.segmented button[aria-pressed="true"] {
+  color: var(--panel);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.zoomers { display: flex; flex-direction: column; gap: 4px; pointer-events: auto; }
+.zoomers button {
+  width: 27px; height: 27px;
+  display: grid; place-items: center;
+  font: 500 13px "IBM Plex Mono", monospace;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.zoomers button:hover { border-color: var(--ink-3); }
+
+.scalebar { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.scalebar .bar {
+  height: 5px;
+  border: 1px solid var(--ink);
+  border-top: 0;
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+}
+.scalebar .txt { font: 500 10px "IBM Plex Mono", monospace; color: var(--ink); }
+
+.ramp {
+  display: flex; flex-direction: column; gap: 3px; align-items: flex-end;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 5px 6px;
+}
+.ramp .swatch { width: 132px; height: 7px; border: 1px solid var(--line); border-radius: 2px; }
+.ramp .ends {
+  display: flex; justify-content: space-between; width: 132px;
+  font: 500 9.5px "IBM Plex Mono", monospace; color: var(--ink-2);
+}
+
+/* ---------------- rail ---------------- */
+
+.rail { display: flex; flex-direction: column; gap: 12px; }
+.card { padding: 13px 14px 15px; }
+.card > header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; margin-bottom: 10px;
+}
+.card h3 { font-size: 12.5px; letter-spacing: .01em; }
+.card .note { font-size: 12px; color: var(--ink-2); margin: 8px 0 0; }
+.card .note.sep { border-top: 1px solid var(--line-soft); padding-top: 9px; }
+
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.field:last-child { margin-bottom: 0; }
+.field .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.field label { font: 500 11.5px "IBM Plex Sans", sans-serif; color: var(--ink-2); }
+.field .v { font: 500 12px "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+.field.off { opacity: .45; }
+
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 18px; margin: 0; background: transparent; cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px; border-radius: 2px; background: var(--sunk);
+  border: 1px solid var(--line);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 13px; height: 13px; margin-top: -6px;
+  border-radius: 50%; background: var(--ember);
+  border: 2px solid var(--panel);
+  box-shadow: 0 0 0 1px var(--ember);
+}
+input[type="range"]::-moz-range-track {
+  height: 3px; border-radius: 2px; background: var(--sunk); border: 1px solid var(--line);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--ember); border: 2px solid var(--panel);
+}
+input[type="range"]:disabled { cursor: not-allowed; }
+
+.toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.toggle {
+  font: 500 11px "IBM Plex Mono", monospace;
+  color: var(--ink-2);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px; padding: 4px 9px; cursor: pointer;
+}
+.toggle[aria-pressed="true"] {
+  color: var(--ember-ink); border-color: var(--ember); background: var(--ember-wash);
+}
+
+.compass { display: block; width: 100%; height: auto; }
+.dial { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-top: 10px; }
+.dial .item { display: flex; flex-direction: column; }
+.dial .item .k {
+  font: 500 9.5px "IBM Plex Mono", monospace; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.dial .item .v { font: 500 12.5px "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+
+#hist { display: block; width: 100%; height: auto; }
+
+.evidence { display: flex; flex-direction: column; gap: 10px; }
+.evidence .patchwrap { position: relative; }
+#patch {
+  display: block; width: 100%; height: auto;
+  background: var(--sunk); border-radius: 6px; border: 1px solid var(--line);
+}
+.evidence .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+.evidence .line {
+  display: flex; justify-content: space-between; gap: 8px;
+  font: 400 11.5px "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+  border-bottom: 1px dotted var(--line);
+  padding-bottom: 2px;
+}
+.evidence .line .k { color: var(--ink-3); }
+.pass { color: var(--good); }
+.fail { color: var(--ink-3); }
+.empty { font-size: 12.5px; color: var(--ink-3); }
+
+.tally { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+.tally i {
+  width: 9px; height: 9px; border-radius: 2px; display: block;
+  border: 1px solid var(--line); background: var(--panel-2);
+}
+.tally i.on { background: var(--ember); border-color: var(--ember); }
+.tally i.hub.on { background: var(--sky); border-color: var(--sky); }
+
+/* ---------------- lower sheets ---------------- */
+
+.strip {
+  display: grid;
+  grid-template-columns: minmax(0, 300px) minmax(0, 340px) minmax(0, 1fr);
+  gap: 16px;
+  padding: 4px 0 8px;
+  align-items: start;
+}
+@media (max-width: 1080px) { .strip { grid-template-columns: minmax(0, 1fr); } }
+
+.strip .tablewrap { max-height: 296px; overflow: auto; }
+
+.sheets {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 8px 0 26px;
+  align-items: start;
+}
+@media (max-width: 1080px) { .sheets { grid-template-columns: minmax(0, 1fr); } }
+
+.sheet { padding: 20px clamp(16px, 2.4vw, 26px) 22px; }
+.sheet h2 { font-size: 17px; margin-bottom: 3px; }
+.sheet > .eyebrow { display: block; margin-bottom: 12px; }
+.prose { max-width: 62ch; }
+.prose p { margin: 0 0 11px; color: var(--ink-2); }
+.prose p strong { color: var(--ink); font-weight: 500; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.steps li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 12px; }
+.steps .idx {
+  font: 500 11px "IBM Plex Mono", monospace;
+  color: var(--ember-ink);
+  border-top: 2px solid var(--ember);
+  padding-top: 5px;
+}
+.steps h3 { font-size: 13.5px; margin-bottom: 3px; }
+.steps p { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+.steps code, .prose code, .cell code {
+  font: 400 12.5px "IBM Plex Mono", monospace;
+  background: var(--panel-2); border: 1px solid var(--line-soft);
+  border-radius: 4px; padding: 0 4px;
+}
+
+pre {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-x: auto;
+  font: 400 12.5px/1.65 "IBM Plex Mono", monospace;
+  color: var(--ink);
+}
+pre .c { color: var(--ink-3); }
+pre .f { color: var(--ember-ink); }
+
+.tablewrap { overflow-x: auto; margin-top: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td {
+  text-align: right; padding: 5px 10px 5px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-variant-numeric: tabular-nums;
+  font-family: "IBM Plex Mono", monospace;
+  white-space: nowrap;
+}
+th {
+  font-size: 9.5px; letter-spacing: .11em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 500; border-bottom-color: var(--line);
+}
+th:first-child, td:first-child { text-align: left; }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--panel-2); }
+tbody tr[aria-selected="true"] td { background: var(--ember-wash); color: var(--ember-ink); }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 12px 18px; margin-top: 4px; }
+.facts .cell { display: flex; flex-direction: column; gap: 2px; }
+.facts .cell .v { white-space: nowrap; }
+.facts .cell .k {
+  font: 500 9.5px "IBM Plex Mono", monospace; letter-spacing: .11em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.facts .cell .v { font: 500 13px "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+.facts .cell .v small { font-weight: 400; color: var(--ink-2); }
+
+footer {
+  border-top: 1px solid var(--line);
+  padding: 18px 0 34px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+footer .wrap { display: flex; flex-wrap: wrap; gap: 6px 26px; }
+
+.flag {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: 12.5px; color: var(--ink-2);
+  background: var(--panel-2);
+  border: 1px solid var(--line-soft);
+  border-left: 2px solid var(--sky);
+  border-radius: 0 6px 6px 0;
+  padding: 8px 11px; margin-top: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+</style>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="brand">
+      <h1>Turbine Shadow Census</h1>
+      <span class="tag mono" id="sceneTag">&nbsp;</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="readout">
+      <div class="cell">
+        <span class="val hit" id="statCount">—</span>
+        <span class="lab">candidates</span>
+      </div>
+      <div class="cell">
+        <span class="val" id="statThresh">—</span>
+        <span class="lab">−log₁₀ NFA cut</span>
+      </div>
+      <div class="cell">
+        <span class="val" id="statPixels">—</span>
+        <span class="lab">pixels tested</span>
+      </div>
+    </div>
+    <button class="ghost" id="btnFit" type="button">Fit scene</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="console">
+    <div class="panel stage">
+      <canvas id="view" role="img" aria-label="Sentinel-2 scene with wind turbine detection overlay"></canvas>
+
+      <div class="hud tl">
+        <div class="segmented" role="group" aria-label="Layer">
+          <button type="button" data-mode="image" aria-pressed="false">Imagery</button>
+          <button type="button" data-mode="blend" aria-pressed="true">Blend</button>
+          <button type="button" data-mode="nfa" aria-pressed="false">Evidence</button>
+        </div>
+        <div class="chip wide" id="cursor" hidden>
+          <span class="k">row / col</span><span id="curRC">—</span>
+          <span class="k">DN (B02)</span><span id="curDN">—</span>
+          <span class="k">−log₁₀ NFA</span><span id="curNFA">—</span>
+          <span class="k">lat / lon</span><span id="curLL">—</span>
+        </div>
+      </div>
+
+      <div class="hud tr">
+        <div class="zoomers">
+          <button type="button" id="zIn" aria-label="Zoom in">+</button>
+          <button type="button" id="zOut" aria-label="Zoom out">−</button>
+          <button type="button" id="zRe" aria-label="Reset view">⤾</button>
+        </div>
+      </div>
+
+      <div class="hud bl">
+        <div class="scalebar">
+          <div class="bar" id="scaleBar" style="width:80px"></div>
+          <span class="txt" id="scaleTxt">—</span>
+        </div>
+      </div>
+
+      <div class="hud br">
+        <div class="ramp">
+          <div class="swatch" id="rampSwatch"></div>
+          <div class="ends"><span id="rampLo">—</span><span id="rampHi">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="panel card">
+        <header><h3>Detection cut</h3><span class="eyebrow" id="cutState">—</span></header>
+        <div class="field">
+          <div class="row">
+            <label for="tNfa">Significance −log₁₀(NFA)</label>
+            <span class="v" id="tNfaV">—</span>
+          </div>
+          <input type="range" id="tNfa" min="-1" max="8" step="0.05" value="1">
+        </div>
+        <div class="field">
+          <div class="row">
+            <label for="opac">Evidence layer opacity</label>
+            <span class="v" id="opacV">—</span>
+          </div>
+          <input type="range" id="opac" min="0" max="100" step="1" value="62">
+        </div>
+        <div class="toggles">
+          <button class="toggle" id="tgMarks" type="button" aria-pressed="true">Markers</button>
+          <button class="toggle" id="tgMask" type="button" aria-pressed="true">Above-cut mask</button>
+          <button class="toggle" id="tgSampling" type="button" aria-pressed="true">Sampling overlay</button>
+        </div>
+        <p class="note sep" id="cutNote">&nbsp;</p>
+      </div>
+
+      <div class="panel card">
+        <header><h3>Acquisition geometry</h3><span class="eyebrow" id="geoTag">—</span></header>
+        <svg class="compass" id="compass" viewBox="0 0 300 168" aria-hidden="true"></svg>
+        <div class="dial">
+          <div class="item"><span class="k">Sun azimuth</span><span class="v" id="gSunAz">—</span></div>
+          <div class="item"><span class="k">Sun altitude</span><span class="v" id="gSunAl">—</span></div>
+          <div class="item"><span class="k">Shadow length</span><span class="v" id="gShadow">—</span></div>
+          <div class="item"><span class="k">Hub offset</span><span class="v" id="gHub">—</span></div>
+        </div>
+        <div class="field" style="margin-top:12px" id="fieldShadow">
+          <div class="row">
+            <label for="tShadow">Shadow contrast <code>diff_s</code></label>
+            <span class="v" id="tShadowV">—</span>
+          </div>
+          <input type="range" id="tShadow" min="0" max="80" step="1" value="25">
+        </div>
+        <div class="field" id="fieldHub">
+          <div class="row">
+            <label for="tHub">Hub contrast <code>diff_h</code></label>
+            <span class="v" id="tHubV">—</span>
+          </div>
+          <input type="range" id="tHub" min="0" max="150" step="1" value="50">
+        </div>
+        <p class="note" id="liveNote">&nbsp;</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="strip">
+    <div class="panel card">
+      <header><h3>Evidence distribution</h3><span class="eyebrow">per valid pixel</span></header>
+      <svg id="hist" viewBox="0 0 300 128" role="img" aria-label="Histogram of -log10(NFA) over the scene"></svg>
+      <p class="note" id="histNote">&nbsp;</p>
+    </div>
+
+    <div class="panel card">
+      <header><h3>Why this pixel</h3><span class="eyebrow" id="inspTag">nothing selected</span></header>
+      <div class="evidence">
+        <div class="patchwrap">
+          <canvas id="patch" width="640" height="640"
+            aria-label="Magnified patch with the sampled shadow and hub positions"></canvas>
+        </div>
+        <div id="inspBody" class="empty">
+          Click any candidate on the map — or any pixel — to replay the two tests
+          the detector ran there, sample by sample.
+        </div>
+      </div>
+    </div>
+
+    <div class="panel card">
+      <header><h3>Candidates above the cut</h3><span class="eyebrow" id="tableTag">—</span></header>
+      <p class="note" id="tableNote" style="margin:0 0 8px">—</p>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>−log₁₀ NFA</th><th>px</th>
+              <th>latitude</th><th>longitude</th><th>row, col</th>
+            </tr>
+          </thead>
+          <tbody id="detBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheets">
+    <div class="panel sheet">
+      <span class="eyebrow">The method</span>
+      <h2>A turbine is a shadow with an alibi</h2>
+      <div class="prose">
+        <p>
+          At 10 m per pixel a wind turbine is not an object — it is a smear. What
+          survives is <strong>geometry</strong>: a thin dark blade of shadow thrown
+          exactly where the sun says it must fall, ending in a bright nacelle sitting
+          exactly where the satellite's viewing angle says the hub must be. The
+          detector never learns what a turbine looks like. It asks how unlikely this
+          particular arrangement of dark and bright pixels would be in an image with
+          no turbine in it.
+        </p>
+      </div>
+      <ol class="steps">
+        <li>
+          <span class="idx">01</span>
+          <div>
+            <h3>Walk the modelled shadow</h3>
+            <p id="stepShadow">—</p>
+          </div>
+        </li>
+        <li>
+          <span class="idx">02</span>
+          <div>
+            <h3>Look for the hub</h3>
+            <p id="stepHub">—</p>
+          </div>
+        </li>
+        <li>
+          <span class="idx">03</span>
+          <div>
+            <h3>Price the coincidence</h3>
+            <p id="stepNfa">—</p>
+          </div>
+        </li>
+      </ol>
+      <div class="facts" id="facts" style="margin-top:18px"></div>
+      <div class="flag" id="flagBox" hidden><span id="flagText"></span></div>
+    </div>
+
+    <div class="panel sheet">
+      <span class="eyebrow">Output</span>
+      <h2>Run it on your own scene</h2>
+      <pre><span class="c"># build the page and open it, with the detector live behind it</span>
+python3 -m venv .venv
+.venv/bin/pip install -r <span class="f">demo/requirements.txt</span>
+.venv/bin/python <span class="f">demo/turbine_demo.py</span> --serve
+
+<span class="c"># any single-band Sentinel-2 GeoTIFF plus its sidecar</span>
+.venv/bin/python demo/turbine_demo.py \
+    --image example/test.tif \
+    --meta example/test_meta.txt \
+    --heights 60,80,100 --t-nfa 1 --serve</pre>
+      <p class="note sep" style="margin-top:12px">
+        Every run also writes <code>detections.csv</code> and
+        <code>detections.geojson</code> beside the page, so the candidates drop
+        straight into QGIS.
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>A-contrario detector by Nicolas Mandroux, v0.1 (2021) — AGPL-3.0.</span>
+    <span>Imagery: Copernicus Sentinel-2, ESA.</span>
+    <span id="footRuntime" class="mono"></span>
+  </div>
+</footer>
+
+<script type="application/json" id="payload">__PAYLOAD__</script>
+<script>
+(() => {
+"use strict";
+
+const P = JSON.parse(document.getElementById("payload").textContent);
+const W = P.scene.width, H = P.scene.height, N = W * H;
+const el = (id) => document.getElementById(id);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const fmt = (v, d = 2) => Number(v).toFixed(d);
+const big = (n) => n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n.toLocaleString();
+
+/* ---------- state ---------------------------------------------------- */
+
+const S = {
+  mode: "blend",
+  opacity: 0.62,
+  tNfa: P.params.tNFA,
+  tShadow: P.params.tShadow,
+  tHub: P.params.tHub,
+  marks: true, mask: true, sampling: true,
+  scale: 1, tx: 0, ty: 0,
+  sel: null, hover: null, live: false, busy: false,
+  nfaRange: [P.nfa.low, P.nfa.high],
+  geom: P.geometry.sampling,
+  stats: P.stats,
+  hist: P.histogram,
+  dets: [],
+  step: 0,
+};
+
+let dn, valid, nfa;                    // per-pixel rasters
+const baseCv = document.createElement("canvas");   // stretched grey imagery
+const heatCv = document.createElement("canvas");   // evidence, transparent where there is none
+const fieldCv = document.createElement("canvas");  // the whole -log10(NFA) field, opaque
+const maskCv = document.createElement("canvas");   // pixels above the cut
+for (const c of [baseCv, heatCv, fieldCv, maskCv]) { c.width = W; c.height = H; }
+
+const view = el("view");
+const ctx = view.getContext("2d");
+const patch = el("patch");
+const pctx = patch.getContext("2d");
+
+/* Sequential ramp for magnitude: monotonically lighter, deep indigo through
+   the page's ember to a pale gold. One direction, no hue cycling. */
+const RAMP = [
+  [0.00, [22, 26, 56]], [0.22, [69, 34, 92]], [0.44, [131, 44, 84]],
+  [0.64, [186, 70, 44]], [0.82, [226, 128, 36]], [1.00, [250, 226, 168]],
+];
+const LUT = new Uint8Array(256 * 3);
+for (let i = 0; i < 256; i++) {
+  const t = i / 255;
+  let a = RAMP[0], b = RAMP[RAMP.length - 1];
+  for (let k = 0; k < RAMP.length - 1; k++) {
+    if (t >= RAMP[k][0] && t <= RAMP[k + 1][0]) { a = RAMP[k]; b = RAMP[k + 1]; break; }
+  }
+  const f = b[0] === a[0] ? 0 : (t - a[0]) / (b[0] - a[0]);
+  for (let c = 0; c < 3; c++) LUT[i * 3 + c] = Math.round(a[1][c] + f * (b[1][c] - a[1][c]));
+}
+const rampCss = () => RAMP.map(([t, c]) => `rgb(${c.join(",")}) ${(t * 100).toFixed(0)}%`).join(",");
+
+function token(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+let ink, ink2, ink3, ember, sky, line, panel;
+function readTokens() {
+  ink = token("--ink"); ink2 = token("--ink-2"); ink3 = token("--ink-3");
+  ember = token("--ember"); sky = token("--sky"); line = token("--line");
+  panel = token("--panel");
+}
+readTokens();
+
+/* ---------- raster decoding ------------------------------------------ */
+
+async function decode(uri) {
+  const img = new Image();
+  img.src = uri;
+  await img.decode();
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext("2d", { willReadFrequently: true });
+  g.drawImage(img, 0, 0);
+  return g.getImageData(0, 0, c.width, c.height).data;
+}
+
+function unpack(raw, lo, hi) {
+  const out = new Float32Array(N);
+  const span = (hi - lo) / 65535;
+  for (let i = 0, j = 0; i < N; i++, j += 4) {
+    out[i] = lo + (raw[j] * 256 + raw[j + 1]) * span;
+  }
+  return out;
+}
+
+async function loadRasters() {
+  const [rRefl, rNfa] = await Promise.all([decode(P.reflectance.uri), decode(P.nfa.uri)]);
+  dn = new Uint16Array(N);
+  valid = new Uint8Array(N);
+  for (let i = 0, j = 0; i < N; i++, j += 4) {
+    dn[i] = rRefl[j] * 256 + rRefl[j + 1];
+    valid[i] = rRefl[j + 2] > 127 ? 1 : 0;
+  }
+  nfa = unpack(rNfa, P.nfa.low, P.nfa.high);
+}
+
+/* ---------- offscreen layers ----------------------------------------- */
+
+/* Digital numbers to display grey, once, into a 256-entry table. */
+const GREY = (() => {
+  const [lo, hi] = P.reflectance.stretch;
+  const inv = 1 / (P.reflectance.gamma || 1);
+  const t = new Uint8Array(4096);
+  for (let i = 0; i < t.length; i++) {
+    const x = clamp((i * 16 - lo) / Math.max(1, hi - lo), 0, 1);
+    t[i] = Math.round(Math.pow(x, inv) * 255);
+  }
+  return (v) => t[Math.min(4095, v >> 4)];
+})();
+
+function paintBase() {
+  const g = baseCv.getContext("2d");
+  const img = g.createImageData(W, H);
+  const d = img.data;
+  for (let i = 0, j = 0; i < N; i++, j += 4) {
+    if (!valid[i]) { d[j + 3] = 0; continue; }
+    d[j] = d[j + 1] = d[j + 2] = GREY(dn[i]);
+    d[j + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+}
+
+function paintHeat() {
+  const lo = -2, hi = Math.max(3, Math.ceil(P.nfa.max));
+  const g = heatCv.getContext("2d"), gf = fieldCv.getContext("2d");
+  const img = g.createImageData(W, H), field = gf.createImageData(W, H);
+  const d = img.data, f = field.data;
+  const span = 1 / (hi - lo), pos = 1 / hi;
+  for (let i = 0, j = 0; i < N; i++, j += 4) {
+    if (!valid[i]) { d[j + 3] = 0; f[j + 3] = 0; continue; }
+    const v = nfa[i];
+    let t = (v - lo) * span;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const k = (t * 255) | 0;
+    f[j] = LUT[k * 3]; f[j + 1] = LUT[k * 3 + 1]; f[j + 2] = LUT[k * 3 + 2]; f[j + 3] = 255;
+    // Over the imagery, only evidence in favour of a turbine is worth ink:
+    // everything at or below zero stays fully transparent.
+    let e = v * pos;
+    e = e < 0 ? 0 : e > 1 ? 1 : e;
+    if (e === 0) { d[j + 3] = 0; continue; }
+    const ke = (0.45 + 0.55 * e) * 255 | 0;
+    d[j] = LUT[ke * 3]; d[j + 1] = LUT[ke * 3 + 1]; d[j + 2] = LUT[ke * 3 + 2];
+    d[j + 3] = 30 + 225 * Math.pow(e, 0.55);
+  }
+  g.putImageData(img, 0, 0);
+  gf.putImageData(field, 0, 0);
+  el("rampSwatch").style.background = `linear-gradient(90deg,${rampCss()})`;
+  el("rampLo").textContent = lo;
+  el("rampHi").textContent = `${hi}  −log₁₀ NFA`;
+}
+
+function paintMask() {
+  const g = maskCv.getContext("2d");
+  const img = g.createImageData(W, H);
+  const d = img.data;
+  const t = S.tNfa;
+  for (let i = 0, j = 0; i < N; i++, j += 4) {
+    if (valid[i] && nfa[i] > t) {
+      d[j] = 255; d[j + 1] = 246; d[j + 2] = 214; d[j + 3] = 235;
+    }
+  }
+  g.putImageData(img, 0, 0);
+}
+
+/* ---------- detection: connected components above the cut ------------ */
+
+const CLUSTER_CAP = 250000;   // past this the cut is a paint job, not a detection
+
+function detect() {
+  const t = S.tNfa;
+  let above = 0;
+  for (let i = 0; i < N; i++) if (valid[i] && nfa[i] > t) above++;
+  S.above = above;
+  if (above > CLUSTER_CAP) { S.dets = []; return; }
+
+  const seen = new Uint8Array(N);
+  const stack = [];
+  const out = [];
+  for (let i = 0; i < N; i++) {
+    if (seen[i] || !valid[i] || nfa[i] <= t) continue;
+    let size = 0, best = -Infinity, bi = i;
+    stack.length = 0;
+    stack.push(i); seen[i] = 1;
+    while (stack.length) {
+      const p = stack.pop();
+      const r = (p / W) | 0, c = p - r * W;
+      size++;
+      if (nfa[p] > best) { best = nfa[p]; bi = p; }
+      for (let dr = -1; dr <= 1; dr++) {
+        const rr = r + dr;
+        if (rr < 0 || rr >= H) continue;
+        for (let dc = -1; dc <= 1; dc++) {
+          const cc = c + dc;
+          if (cc < 0 || cc >= W) continue;
+          const q = rr * W + cc;
+          if (seen[q] || !valid[q] || nfa[q] <= t) continue;
+          seen[q] = 1;
+          stack.push(q);
+        }
+      }
+    }
+    const row = (bi / W) | 0;
+    out.push({ row, col: bi - row * W, nfa: best, pixels: size });
+  }
+  out.sort((a, b) => b.nfa - a.nfa);
+  out.forEach((d, i) => {
+    d.id = i + 1;
+    const ll = latlon(d.row, d.col);
+    d.lat = ll[0]; d.lon = ll[1];
+  });
+  S.dets = out;
+}
+
+function latlon(row, col) {
+  const c = P.scene.corners;
+  const fx = (col + 0.5) / W, fy = (row + 0.5) / H;
+  const top = [c.ul[0] + (c.ur[0] - c.ul[0]) * fx, c.ul[1] + (c.ur[1] - c.ul[1]) * fx];
+  const bot = [c.ll[0] + (c.lr[0] - c.ll[0]) * fx, c.ll[1] + (c.lr[1] - c.ll[1]) * fx];
+  return [top[0] + (bot[0] - top[0]) * fy, top[1] + (bot[1] - top[1]) * fy];
+}
+
+const latlonText = (lat, lon) =>
+  `${Math.abs(lat).toFixed(5)}°${lat < 0 ? "S" : "N"} ${Math.abs(lon).toFixed(5)}°${lon < 0 ? "W" : "E"}`;
+
+/* ---------- viewport -------------------------------------------------- */
+
+/* On a narrow screen a fixed-height canvas letterboxes a wide scene into a
+   sliver, so there the stage takes the scene's own aspect ratio. */
+function sizeStage() {
+  const w = view.getBoundingClientRect().width;
+  view.style.height = window.innerWidth <= 720
+    ? `${clamp(Math.round(w * H / W), 220, 520)}px` : "";
+}
+
+function fit() {
+  const r = view.getBoundingClientRect();
+  S.scale = Math.min(r.width / W, r.height / H);
+  S.tx = (r.width - W * S.scale) / 2;
+  S.ty = (r.height - H * S.scale) / 2;
+}
+
+function zoomAt(px, py, factor) {
+  const s = clamp(S.scale * factor, Math.min(0.2, fitScale() * 0.5), 60);
+  const k = s / S.scale;
+  S.tx = px - (px - S.tx) * k;
+  S.ty = py - (py - S.ty) * k;
+  S.scale = s;
+  draw();
+}
+
+function fitScale() {
+  const r = view.getBoundingClientRect();
+  return Math.min(r.width / W, r.height / H);
+}
+
+function draw() {
+  const dpr = window.devicePixelRatio || 1;
+  const r = view.getBoundingClientRect();
+  if (view.width !== Math.round(r.width * dpr) || view.height !== Math.round(r.height * dpr)) {
+    view.width = Math.round(r.width * dpr);
+    view.height = Math.round(r.height * dpr);
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, r.width, r.height);
+
+  ctx.save();
+  ctx.translate(S.tx, S.ty);
+  ctx.scale(S.scale, S.scale);
+  ctx.imageSmoothingEnabled = S.scale < 1.4;
+  if (S.mode === "nfa") {
+    ctx.drawImage(fieldCv, 0, 0);
+  } else {
+    ctx.drawImage(baseCv, 0, 0);
+    if (S.mode === "blend" && S.opacity > 0) {
+      ctx.globalAlpha = S.opacity;
+      ctx.drawImage(heatCv, 0, 0);
+      ctx.globalAlpha = 1;
+    }
+  }
+  if (S.mask) { ctx.globalAlpha = 0.75; ctx.drawImage(maskCv, 0, 0); ctx.globalAlpha = 1; }
+  ctx.restore();
+
+  if (S.sampling && S.sel && S.scale > 2.2) drawSampling(S.sel);
+  if (S.marks) drawMarkers(r);
+  drawSelection(r);
+  updateScaleBar();
+}
+
+const toScreen = (row, col) => [S.tx + (col + 0.5) * S.scale, S.ty + (row + 0.5) * S.scale];
+
+function drawMarkers(r) {
+  const many = S.dets.length > 900;
+  ctx.lineWidth = many ? 1 : 1.4;
+  ctx.strokeStyle = ember;
+  for (const d of S.dets) {
+    const [x, y] = toScreen(d.row, d.col);
+    if (x < -20 || y < -20 || x > r.width + 20 || y > r.height + 20) continue;
+    const rad = many ? 3 : clamp(S.scale * 1.6, 5, 13);
+    ctx.beginPath();
+    ctx.arc(x, y, rad, 0, Math.PI * 2);
+    ctx.stroke();
+    if (!many) {
+      ctx.beginPath();
+      ctx.moveTo(x - rad - 3, y); ctx.lineTo(x - rad + 1, y);
+      ctx.moveTo(x + rad - 1, y); ctx.lineTo(x + rad + 3, y);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawSelection(r) {
+  const s = S.sel;
+  if (!s) return;
+  const [x, y] = toScreen(s.row, s.col);
+  const rad = clamp(S.scale * 2.2, 9, 30);
+  ctx.save();
+  ctx.strokeStyle = ember;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.55;
+  ctx.beginPath();
+  ctx.moveTo(x, y - rad - 8); ctx.lineTo(x, y - rad - 2);
+  ctx.moveTo(x, y + rad + 2); ctx.lineTo(x, y + rad + 8);
+  ctx.moveTo(x - rad - 8, y); ctx.lineTo(x - rad - 2, y);
+  ctx.moveTo(x + rad + 2, y); ctx.lineTo(x + rad + 8, y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawSampling(s) {
+  const g = S.geom;
+  ctx.save();
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = ink;
+  ctx.globalAlpha = 0.85;
+  const [cx, cy] = toScreen(s.row, s.col);
+  const last = g.shadow[g.shadow.length - 1];
+  const [ex, ey] = toScreen(s.row + last.row, s.col + last.col);
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
+  for (const sm of g.shadow) {
+    const [x, y] = toScreen(s.row + sm.row, s.col + sm.col);
+    ctx.fillStyle = ink;
+    ctx.beginPath(); ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = sky;
+  for (const hb of g.hub) {
+    const [x, y] = toScreen(s.row + hb.row, s.col + hb.col);
+    ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function updateScaleBar() {
+  const targets = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
+  const mppx = P.scene.resolution / S.scale;
+  let pick = targets[0];
+  for (const t of targets) { if (t / mppx <= 130) pick = t; }
+  el("scaleBar").style.width = `${(pick / mppx).toFixed(1)}px`;
+  el("scaleTxt").textContent = pick >= 1000 ? `${pick / 1000} km` : `${pick} m`;
+}
+
+/* ---------- per-pixel evidence, recomputed from the pixels ------------ */
+
+function bilinear(row, col) {
+  const r1 = Math.floor(row), c1 = Math.floor(col);
+  if (r1 < 0 || c1 < 0 || r1 + 1 >= H || c1 + 1 >= W) return NaN;
+  const fr = row - r1, fc = col - c1, i = r1 * W + c1;
+  return dn[i] * (1 - fr) * (1 - fc) + dn[i + W] * fr * (1 - fc)
+       + dn[i + 1] * (1 - fr) * fc + dn[i + W + 1] * fr * fc;
+}
+
+function lgamma(x) {
+  const g = [76.18009172947146, -86.50532032941677, 24.01409824083091,
+             -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+  let y = x, tmp = x + 5.5, ser = 1.000000000190015;
+  tmp -= (x + 0.5) * Math.log(tmp);
+  for (let j = 0; j < 6; j++) ser += g[j] / ++y;
+  return -tmp + Math.log(2.5066282746310005 * ser / x);
+}
+
+function upperTail(k, n, p) {
+  if (k <= 0) return 1;
+  if (k > n) return 0;
+  let s = 0;
+  for (let m = k; m <= n; m++) {
+    s += Math.exp(lgamma(n + 1) - lgamma(m + 1) - lgamma(n - m + 1)
+                  + m * Math.log(p) + (n - m) * Math.log1p(-p));
+  }
+  return Math.min(1, s);
+}
+
+function evidence(row, col) {
+  const g = S.geom, ds = S.tShadow, dh = S.tHub, st = S.stats;
+  const shadow = g.shadow.map((sm) => {
+    const mid = bilinear(row + sm.row, col + sm.col);
+    const a = bilinear(row + sm.n1[0], col + sm.n1[1]);
+    const b = bilinear(row + sm.n2[0], col + sm.n2[1]);
+    return { mid, a, b, dr: sm.row, dc: sm.col,
+             n1: sm.n1, n2: sm.n2,
+             pass: mid < a - ds && mid < b - ds };
+  });
+  // The published detector compares every hub sample against a ring of
+  // neighbours around the *tested pixel*, not around the sample itself
+  // (main_NFA: plagecompx1 = plagex + compx1).  Mirroring that exactly is what
+  // makes the number below equal the number on the map.
+  const hub = g.hub.map((hb) => {
+    const mid = bilinear(row + hb.row, col + hb.col);
+    let pass = true, margin = Infinity;
+    for (const [dr, dc] of g.hubRing) {
+      const nb = bilinear(row + dr, col + dc);
+      margin = Math.min(margin, mid - nb);
+      if (!(mid > nb + dh)) pass = false;
+    }
+    return { mid, margin, pass, dr: hb.row, dc: hb.col };
+  });
+  const ks = shadow.filter((s) => s.pass).length;
+  const kh = hub.filter((h) => h.pass).length;
+  const k = ks + kh;
+  const tail = upperTail(k, st.kMax, st.pMean);
+  const logNfa = -(Math.log10(Math.max(tail, Number.MIN_VALUE))
+                   + Math.log10(st.nTests) + Math.log10(st.nHeights));
+  return { shadow, hub, ks, kh, k, tail, logNfa };
+}
+
+/* ---------- inspector ------------------------------------------------- */
+
+function patchWindow() {
+  const g = S.geom;
+  let r0 = 0, r1 = 0, c0 = 0, c1 = 0;
+  const acc = (r, c) => { r0 = Math.min(r0, r); r1 = Math.max(r1, r); c0 = Math.min(c0, c); c1 = Math.max(c1, c); };
+  for (const s of g.shadow) { acc(s.row, s.col); acc(s.n1[0], s.n1[1]); acc(s.n2[0], s.n2[1]); }
+  for (const h of g.hub) for (const [dr, dc] of g.hubRing) acc(h.row + dr, h.col + dc);
+  const pad = 2.5;
+  return { r0: Math.floor(r0 - pad), r1: Math.ceil(r1 + pad),
+           c0: Math.floor(c0 - pad), c1: Math.ceil(c1 + pad) };
+}
+
+function drawPatch(sel, ev) {
+  const win = patchWindow();
+  const pw = win.c1 - win.c0 + 1, ph = win.r1 - win.r0 + 1;
+  const box = patch.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const side = Math.max(160, box.width || 300);
+  patch.width = Math.round(side * dpr);
+  patch.height = Math.round(side * dpr * ph / pw);
+  const k = patch.width / pw;                     // device px per image px
+  pctx.setTransform(1, 0, 0, 1, 0, 0);
+  pctx.fillStyle = token("--sunk");
+  pctx.fillRect(0, 0, patch.width, patch.height);
+
+  const tmp = document.createElement("canvas");
+  tmp.width = pw; tmp.height = ph;
+  const tg = tmp.getContext("2d");
+  const img = tg.createImageData(pw, ph);
+  for (let r = 0; r < ph; r++) {
+    for (let c = 0; c < pw; c++) {
+      const gr = sel.row + win.r0 + r, gc = sel.col + win.c0 + c;
+      const j = (r * pw + c) * 4;
+      if (gr < 0 || gc < 0 || gr >= H || gc >= W || !valid[gr * W + gc]) continue;
+      img.data[j] = img.data[j + 1] = img.data[j + 2] = GREY(dn[gr * W + gc]);
+      img.data[j + 3] = 255;
+    }
+  }
+  tg.putImageData(img, 0, 0);
+  pctx.imageSmoothingEnabled = false;
+  pctx.drawImage(tmp, 0, 0, patch.width, patch.height);
+
+  // image coords -> patch device coords
+  const px = (dc) => (dc - win.c0 + 0.5) * k;
+  const py = (dr) => (dr - win.r0 + 0.5) * k;
+
+  pctx.lineWidth = Math.max(1, k * 0.07);
+  const cur = S.geom.shadow.length ? S.step % (S.geom.shadow.length + S.geom.hub.length) : -1;
+
+  // modelled shadow line
+  const last = S.geom.shadow[S.geom.shadow.length - 1];
+  pctx.strokeStyle = ink;
+  pctx.globalAlpha = 0.5;
+  pctx.beginPath(); pctx.moveTo(px(0), py(0)); pctx.lineTo(px(last.col), py(last.row)); pctx.stroke();
+  pctx.globalAlpha = 1;
+
+  ev.shadow.forEach((s, i) => {
+    const on = i === cur;
+    pctx.beginPath();
+    pctx.arc(px(s.dc), py(s.dr), k * (on ? 0.34 : 0.26), 0, Math.PI * 2);
+    pctx.fillStyle = s.pass ? ember : "transparent";
+    pctx.strokeStyle = s.pass ? ember : ink3;
+    if (s.pass) pctx.fill();
+    pctx.stroke();
+    if (on) {
+      pctx.strokeStyle = ink;
+      pctx.beginPath();
+      pctx.moveTo(px(s.n1[1]), py(s.n1[0]));
+      pctx.lineTo(px(s.n2[1]), py(s.n2[0]));
+      pctx.stroke();
+      for (const nb of [s.n1, s.n2]) {
+        pctx.beginPath();
+        pctx.arc(px(nb[1]), py(nb[0]), k * 0.18, 0, Math.PI * 2);
+        pctx.fillStyle = panel; pctx.fill(); pctx.stroke();
+      }
+      pctx.beginPath();
+      pctx.arc(px(s.dc), py(s.dr), k * 0.52, 0, Math.PI * 2);
+      pctx.strokeStyle = ink; pctx.stroke();
+    }
+  });
+
+  ev.hub.forEach((h, i) => {
+    const on = i + ev.shadow.length === cur;
+    pctx.beginPath();
+    pctx.arc(px(h.dc), py(h.dr), k * (on ? 0.3 : 0.2), 0, Math.PI * 2);
+    pctx.fillStyle = h.pass ? sky : "transparent";
+    pctx.strokeStyle = h.pass ? sky : ink3;
+    if (h.pass) pctx.fill();
+    pctx.stroke();
+    if (on) {
+      pctx.strokeStyle = sky;
+      pctx.globalAlpha = 0.9;
+      for (const [dr, dc] of S.geom.hubRing) {
+        pctx.beginPath();
+        pctx.arc(px(dc), py(dr), k * 0.16, 0, Math.PI * 2);
+        pctx.stroke();
+        pctx.beginPath();
+        pctx.moveTo(px(h.dc), py(h.dr)); pctx.lineTo(px(dc), py(dr));
+        pctx.globalAlpha = 0.3; pctx.stroke(); pctx.globalAlpha = 0.9;
+      }
+      pctx.globalAlpha = 1;
+    }
+  });
+
+  // the pixel under test
+  pctx.strokeStyle = ember;
+  pctx.lineWidth = Math.max(1.2, k * 0.09);
+  pctx.strokeRect(px(0) - k / 2, py(0) - k / 2, k, k);
+}
+
+function renderInspector() {
+  const sel = S.sel;
+  const tag = el("inspTag"), body = el("inspBody");
+  if (!sel) {
+    tag.textContent = "nothing selected";
+    body.className = "empty";
+    body.innerHTML = "Click any candidate on the map — or any pixel — to replay the "
+      + "two tests the detector ran there, sample by sample.";
+    pctx.setTransform(1, 0, 0, 1, 0, 0);
+    pctx.clearRect(0, 0, patch.width, patch.height);
+    return;
+  }
+  const ev = evidence(sel.row, sel.col);
+  const stored = nfa[sel.row * W + sel.col];
+  const agree = Math.abs(stored - ev.logNfa) < 0.05;
+  const cur = S.step % (S.geom.shadow.length + S.geom.hub.length);
+  const shadowN = S.geom.shadow.length;
+  let live = "";
+  if (cur < shadowN) {
+    const s = ev.shadow[cur];
+    live = `<div class="line"><span class="k">shadow sample ${cur + 1}</span>`
+      + `<span>${fmt(s.mid, 0)} vs ${fmt(s.a, 0)} / ${fmt(s.b, 0)} `
+      + `<b class="${s.pass ? "pass" : "fail"}">${s.pass ? "darker" : "no"}</b></span></div>`;
+  } else {
+    const h = ev.hub[cur - shadowN];
+    live = `<div class="line"><span class="k">hub sample ${cur - shadowN + 1}</span>`
+      + `<span>margin ${h.margin > 0 ? "+" : ""}${fmt(h.margin, 0)} DN `
+      + `<b class="${h.pass ? "pass" : "fail"}">${h.pass ? "brighter" : "no"}</b></span></div>`;
+  }
+
+  tag.textContent = sel.id ? `candidate #${sel.id}` : `row ${sel.row}, col ${sel.col}`;
+  body.className = "";
+  body.innerHTML = `
+    <div class="line"><span class="k">shadow tests passed</span>
+      <span>${ev.ks} / ${S.stats.nShadow}</span></div>
+    <div class="tally">${ev.shadow.map((s) => `<i class="${s.pass ? "on" : ""}"></i>`).join("")}</div>
+    <div class="line" style="margin-top:6px"><span class="k">hub tests passed</span>
+      <span>${ev.kh} / ${S.stats.nHub}</span></div>
+    <div class="tally">${ev.hub.map((h) => `<i class="hub ${h.pass ? "on" : ""}"></i>`).join("")}</div>
+    ${live}
+    <div class="line" style="margin-top:6px"><span class="k">K of ${S.stats.kMax} tests</span>
+      <span>${ev.k}</span></div>
+    <div class="line"><span class="k">P(K or more by chance)</span>
+      <span>${ev.tail < 1e-4 ? ev.tail.toExponential(2) : fmt(ev.tail, 5)}</span></div>
+    <div class="line"><span class="k">−log₁₀ NFA${agree ? "" : " (recomputed)"}</span>
+      <span><b>${fmt(ev.logNfa, 2)}</b></span></div>
+    ${agree ? "" : `<div class="line"><span class="k">−log₁₀ NFA (map)</span>
+      <span>${fmt(stored, 2)}</span></div>`}
+    <div class="line"><span class="k">brightness at pixel</span>
+      <span>${dn[sel.row * W + sel.col]} DN</span></div>
+    <div class="line"><span class="k">position</span>
+      <span>${latlonText(sel.lat, sel.lon)}</span></div>
+    ${P.geometry.heights.length > 1 ? `<p class="note">The map keeps the best NFA over
+      ${P.geometry.heights.length} hub heights (${P.geometry.heights.join(", ")} m); this replay
+      walks the ${P.geometry.heights[0]} m geometry, so the two can differ.</p>` : ""}`;
+  drawPatch(sel, ev);
+}
+
+/* ---------- acquisition geometry diagram ------------------------------ */
+
+function renderCompass() {
+  const g = P.geometry, sm = S.geom;
+  const svg = el("compass");
+  const cx = 66, cy = 84, R = 52;
+  const az = (a) => [Math.sin(a * Math.PI / 180), -Math.cos(a * Math.PI / 180)];
+  const [sx, sy] = az(g.sunAzimuth);
+  const [tx, ty] = az(g.satAzimuth);
+  const shade = az(g.sunAzimuth + 180);
+
+  const ring = [];
+  for (const [lab, a] of [["N", 0], ["E", 90], ["S", 180], ["W", 270]]) {
+    const [dx, dy] = az(a);
+    ring.push(`<line x1="${cx + dx * (R - 5)}" y1="${cy + dy * (R - 5)}" x2="${cx + dx * R}" y2="${cy + dy * R}" stroke="${line}" stroke-width="1"/>`);
+    ring.push(`<text x="${cx + dx * (R + 9)}" y="${cy + dy * (R + 9) + 3.5}" fill="${ink3}" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">${lab}</text>`);
+  }
+
+  // side view: tower, sun ray, shadow, satellite line
+  const bx = 196, by = 132, h = g.heights[0];
+  const k = 74 / Math.max(h, sm.shadowLengthM);
+  const th = h * k, sl = sm.shadowLengthM * k;
+  const alt = g.sunAltitude * Math.PI / 180;
+  const zen = g.satZenith * Math.PI / 180;
+  const rayLen = 40;
+
+  svg.innerHTML = `
+    <g>
+      <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${line}" stroke-width="1"/>
+      <circle cx="${cx}" cy="${cy}" r="${R * 0.55}" fill="none" stroke="${line}" stroke-width="1" stroke-dasharray="2 3"/>
+      ${ring.join("")}
+      <line x1="${cx}" y1="${cy}" x2="${cx + shade[0] * R * 0.92}" y2="${cy + shade[1] * R * 0.92}"
+            stroke="${ink}" stroke-width="2.6" stroke-linecap="round"/>
+      <line x1="${cx}" y1="${cy}" x2="${cx + tx * R * 0.7}" y2="${cy + ty * R * 0.7}"
+            stroke="${sky}" stroke-width="1.6" stroke-dasharray="3 3"/>
+      <circle cx="${cx + sx * R * 0.92}" cy="${cy + sy * R * 0.92}" r="6" fill="${ember}"/>
+      <circle cx="${cx}" cy="${cy}" r="2.6" fill="${ink}"/>
+      <text x="6" y="${cy + R + 24}" fill="${ink3}" font-size="8" font-family="IBM Plex Mono, monospace">PLAN · sun, shadow, satellite</text>
+    </g>
+    <g>
+      <line x1="${bx - 34}" y1="${by}" x2="${bx + sl + 16}" y2="${by}" stroke="${line}" stroke-width="1"/>
+      <line x1="${bx}" y1="${by}" x2="${bx}" y2="${by - th}" stroke="${ink2}" stroke-width="2"/>
+      <circle cx="${bx}" cy="${by - th}" r="3.4" fill="${ink}"/>
+      <line x1="${bx - Math.cos(alt) * rayLen}" y1="${by - th - Math.sin(alt) * rayLen}"
+            x2="${bx}" y2="${by - th}" stroke="${ember}" stroke-width="1.5"/>
+      <circle cx="${bx - Math.cos(alt) * rayLen}" cy="${by - th - Math.sin(alt) * rayLen}" r="4.5" fill="${ember}"/>
+      <line x1="${bx}" y1="${by}" x2="${bx + sl}" y2="${by}" stroke="${ember}" stroke-width="3" stroke-linecap="round"/>
+      <line x1="${bx}" y1="${by - th}" x2="${bx + Math.tan(zen) * th}" y2="${by - th - 34}"
+            stroke="${sky}" stroke-width="1.4" stroke-dasharray="3 3"/>
+      <text x="${bx - 4}" y="${by - th - 8}" fill="${ink3}" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="end">${h} m</text>
+      <text x="${bx + sl / 2}" y="${by + 11}" fill="${ink3}" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="middle">${sm.shadowLengthM} m shadow</text>
+      <text x="${bx - 34}" y="${by + 26}" fill="${ink3}" font-size="8" font-family="IBM Plex Mono, monospace">SIDE · ${fmt(g.sunAltitude, 1)}° sun, ${fmt(g.satZenith, 1)}° view</text>
+    </g>`;
+
+  el("gSunAz").textContent = `${fmt(g.sunAzimuth, 1)}°`;
+  el("gSunAl").textContent = `${fmt(g.sunAltitude, 1)}°`;
+  el("gShadow").textContent = `${sm.shadowLengthM} m`;
+  el("gHub").textContent = `${sm.hubOffsetM} m`;
+  el("geoTag").textContent = `${P.scene.satellite} ${P.scene.band}`;
+}
+
+/* ---------- distribution --------------------------------------------- */
+
+function renderHist() {
+  const svg = el("hist");
+  const { counts, edges } = S.hist;
+  const L = 30, R = 8, T = 10, B = 20, w = 300, h = 128;
+  const x0 = edges[0], x1 = edges[edges.length - 1];
+  const sx = (v) => L + (v - x0) / (x1 - x0) * (w - L - R);
+  const top = Math.max(...counts.map((c) => Math.log10(1 + c))) || 1;
+  const sy = (c) => h - B - Math.log10(1 + c) / top * (h - T - B);
+
+  const sup = (n) => "10" + String(n).split("").map((d) => "⁰¹²³⁴⁵⁶⁷⁸⁹"[+d]).join("");
+  const bars = counts.map((c, i) => {
+    const a = sx(edges[i]), b = sx(edges[i + 1]);
+    const y = sy(c);
+    const above = edges[i] >= S.tNfa;
+    return `<rect x="${a.toFixed(2)}" y="${y.toFixed(2)}" width="${Math.max(1, b - a - 1).toFixed(2)}"
+      height="${(h - B - y).toFixed(2)}" rx="1" fill="${above ? ember : ink3}"
+      fill-opacity="${above ? 0.95 : 0.32}"><title>${fmt(edges[i], 1)} to ${fmt(edges[i + 1], 1)}: ${c.toLocaleString()} px</title></rect>`;
+  }).join("");
+
+  const ticks = [];
+  const stepT = (x1 - x0) > 12 ? 4 : 2;
+  for (let v = Math.ceil(x0 / stepT) * stepT; v <= x1; v += stepT) {
+    ticks.push(`<line x1="${sx(v)}" y1="${h - B}" x2="${sx(v)}" y2="${h - B + 3}" stroke="${line}"/>
+      <text x="${sx(v)}" y="${h - B + 13}" fill="${ink3}" font-size="8.5" font-family="IBM Plex Mono, monospace" text-anchor="middle">${v}</text>`);
+  }
+  for (const p of [0, 0.5, 1]) {
+    const y = h - B - p * (h - T - B);
+    ticks.push(`<line x1="${L}" y1="${y}" x2="${w - R}" y2="${y}" stroke="${token("--grid-line")}"/>`);
+  }
+
+  const tx = sx(clamp(S.tNfa, x0, x1));
+  svg.innerHTML = `${ticks.join("")}${bars}
+    <line x1="${tx}" y1="${T - 4}" x2="${tx}" y2="${h - B}" stroke="${ink}" stroke-width="1" stroke-dasharray="3 2"/>
+    <text x="${clamp(tx + 4, L, w - R - 34)}" y="${T + 2}" fill="${ink}" font-size="8.5" font-family="IBM Plex Mono, monospace">cut ${fmt(S.tNfa, 2)}</text>
+    <text x="${L - 5}" y="${h - B + 1}" fill="${ink3}" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="end">1</text>
+    <text x="${L - 5}" y="${T + 6}" fill="${ink3}" font-size="8" font-family="IBM Plex Mono, monospace" text-anchor="end">${sup(Math.round(top))}</text>
+    <text x="${L - 20}" y="${(h - B + T) / 2}" fill="${ink3}" font-size="8" font-family="IBM Plex Mono, monospace"
+      text-anchor="middle" transform="rotate(-90 ${L - 20} ${(h - B + T) / 2})">pixels (log)</text>`;
+  el("histNote").innerHTML = S.above > CLUSTER_CAP
+    ? `<b>${S.above.toLocaleString()}</b> pixels sit above the cut — too many to be evidence of
+       anything. The distribution is telling you where the interesting tail starts.`
+    : `Almost every pixel sits left of zero — the scene is overwhelmingly unremarkable. The cut
+       keeps <b>${S.dets.length.toLocaleString()}</b> cluster${S.dets.length === 1 ? "" : "s"}
+       out of ${S.stats.nTests.toLocaleString()} tested pixels.`;
+}
+
+/* ---------- text panels ---------------------------------------------- */
+
+function renderTable() {
+  const SHOWN = 20;
+  const rows = S.dets.slice(0, SHOWN).map((d) => `
+    <tr data-id="${d.id}" aria-selected="${S.sel && S.sel.id === d.id}">
+      <td>${d.id}</td><td>${fmt(d.nfa, 2)}</td><td>${d.pixels}</td>
+      <td>${d.lat.toFixed(5)}</td><td>${d.lon.toFixed(5)}</td>
+      <td>${d.row}, ${d.col}</td>
+    </tr>`).join("");
+  const flooded = S.above > CLUSTER_CAP;
+  el("detBody").innerHTML = rows
+    || `<tr><td colspan="6">${flooded ? "Cut too low to cluster." : "Nothing above this cut."}</td></tr>`;
+  el("tableTag").textContent = flooded ? "cut too low" : `${S.dets.length.toLocaleString()} found`;
+  el("tableNote").innerHTML = flooded
+    ? `<b>${S.above.toLocaleString()}</b> pixels clear this cut — at that point the map is a
+       texture, not a detection. The mask still shows it; raise the cut to get candidates back.`
+    : S.dets.length
+      ? `Each row is one connected group of above-cut pixels, ranked by evidence.
+         ${S.dets.length > SHOWN ? `Showing the strongest ${SHOWN} of <b>${S.dets.length}</b>.` : ""}
+         Click a row to fly to it.`
+      : "Nothing clears this cut — bring it down and the weaker candidates come back.";
+}
+
+function renderStats() {
+  el("statCount").textContent = S.above > CLUSTER_CAP
+    ? `${(S.above / 1e6).toFixed(2)}M px` : S.dets.length.toLocaleString();
+  el("statThresh").textContent = fmt(S.tNfa, 2);
+  el("statPixels").textContent = big(S.stats.nTests);
+  el("tNfaV").textContent = fmt(S.tNfa, 2);
+  el("opacV").textContent = `${Math.round(S.opacity * 100)}%`;
+  el("tShadowV").textContent = `${S.tShadow} DN`;
+  el("tHubV").textContent = `${S.tHub} DN`;
+  el("cutState").textContent = S.tNfa >= 0 ? "< 1 false alarm expected" : "permissive";
+  const expected = Math.pow(10, -S.tNfa);
+  el("cutNote").innerHTML = `At this cut the a-contrario model expects
+    <b>${expected < 0.001 ? expected.toExponential(1) : fmt(expected, 3)}</b>
+    false alarms in a turbine-free scene of this size. Everything else the page
+    shows is measured, not modelled.`;
+}
+
+function renderSheet() {
+  const g = P.geometry, sm = S.geom, st = S.stats;
+  const px = (m) => (m / P.scene.resolution).toFixed(1);
+  el("stepShadow").innerHTML = `With the sun ${fmt(g.sunAltitude, 1)}° above the horizon,
+    a ${g.heights[0]} m hub throws a ${sm.shadowLengthM} m shadow — ${px(sm.shadowLengthM)} pixels,
+    pointing away from azimuth ${fmt(g.sunAzimuth, 1)}°. The detector samples that line every
+    ${P.params.sampleRateM} m: <b>${st.nShadow} samples</b>, each of which must be at least
+    <b>${S.tShadow} DN</b> darker than both neighbours ${P.params.shadowNeighbourM} m either side of it.`;
+  el("stepHub").innerHTML = `The satellite views from azimuth ${fmt(g.satAzimuth, 1)}° at
+    ${fmt(g.satZenith, 1)}° off nadir, so the nacelle leans ${sm.hubOffsetM} m off the tower base in
+    the image. A hexagonal rosette of <b>${st.nHub} samples</b> covers that spot, and each one has to
+    beat the local background by <b>${S.tHub} DN</b> — measured against six neighbours
+    ${P.params.hubNeighbourM} m out from the tested pixel, which is exactly the comparison the
+    published code makes.`;
+  el("stepNfa").innerHTML = `A single test passes on <b>${(st.pMean * 100).toFixed(2)}%</b> of this
+    scene's pixels by chance, measured on the scene itself. So K passes out of ${st.kMax} tests is a
+    binomial tail; multiply it by the ${st.nTests.toLocaleString()} pixels tested and you get the
+    number of false alarms (NFA) to expect. The map shows −log₁₀ NFA, so
+    <b>0 is one expected false alarm</b> and every step up is a factor of ten fewer.`;
+
+  const facts = [
+    ["Scene", `${W} × ${H} px`, `${(W * P.scene.resolution / 1000).toFixed(1)} × ${(H * P.scene.resolution / 1000).toFixed(1)} km`],
+    ["Acquired", P.scene.acquired.slice(0, 10), P.scene.acquired.slice(11)],
+    ["Tile", P.scene.tile || "—", `UTM ${P.scene.utmZone}`],
+    ["Tests per pixel", String(st.kMax), `${st.nShadow} shadow + ${st.nHub} hub`],
+    ["Chance rate p̄", (st.pMean * 100).toFixed(2) + "%", "measured on scene"],
+    ["Detector runtime", `${P.runtime.seconds} s`, "single core, numpy"],
+    ["Border margin", `${st.marginRows} × ${st.marginCols} px`, "untestable edge"],
+    ["No-data", P.scene.nodataPixels.toLocaleString() + " px", "filled with median"],
+  ];
+  el("facts").innerHTML = facts.map(([k, v, s]) =>
+    `<div class="cell"><span class="k">${k}</span><span class="v">${v}<br><small>${s}</small></span></div>`).join("");
+
+  const cands = P.scene.timeCandidates || {};
+  if (P.scene.timeSource !== "granule_date" && cands.granule_date) {
+    el("flagBox").hidden = false;
+    el("flagText").innerHTML = `This sidecar's <code>granule_date</code> puts the sun
+      ${fmt(cands.granule_date.altitude, 1)}° above the horizon — low enough to send every modelled
+      shadow the wrong way — while its <code>date</code> tag gives
+      ${fmt(cands.date.altitude, 1)}°. The demo used <code>${P.scene.timeSource}</code>; pass
+      <code>--sun-time granule_date</code> to see the detector fail on the wrong geometry.`;
+  }
+  el("footRuntime").textContent = `${P.scene.image} · built from ${P.scene.meta}`;
+  el("sceneTag").textContent =
+    `${P.scene.satellite} ${P.scene.band} · ${P.scene.tile || P.scene.name} · ${latlonText(P.scene.center[0], P.scene.center[1])}`;
+}
+
+/* ---------- interaction ---------------------------------------------- */
+
+function pointerPixel(e) {
+  const r = view.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  return { row: Math.floor((y - S.ty) / S.scale), col: Math.floor((x - S.tx) / S.scale), x, y };
+}
+
+function select(row, col, id) {
+  if (row < 0 || col < 0 || row >= H || col >= W) return;
+  const ll = latlon(row, col);
+  S.sel = { row, col, id: id || null, lat: ll[0], lon: ll[1] };
+  S.step = 0;
+  renderInspector();
+  renderTable();
+  draw();
+}
+
+function flyTo(d) {
+  const r = view.getBoundingClientRect();
+  S.scale = clamp(Math.max(S.scale, 8), 1, 60);
+  S.tx = r.width / 2 - (d.col + 0.5) * S.scale;
+  S.ty = r.height / 2 - (d.row + 0.5) * S.scale;
+  select(d.row, d.col, d.id);
+}
+
+function hoverReadout(e) {
+  const p = pointerPixel(e);
+  const chip = el("cursor");
+  if (p.row < 0 || p.col < 0 || p.row >= H || p.col >= W) { chip.hidden = true; return; }
+  chip.hidden = false;
+  const i = p.row * W + p.col;
+  const ll = latlon(p.row, p.col);
+  el("curRC").textContent = `${p.row}, ${p.col}`;
+  el("curDN").textContent = valid[i] ? `${dn[i]}` : "no data";
+  el("curNFA").textContent = valid[i] ? fmt(nfa[i], 2) : "—";
+  el("curLL").textContent = latlonText(ll[0], ll[1]);
+}
+
+let recomputePending = false;
+function recompute() {
+  if (recomputePending) return;
+  recomputePending = true;
+  requestAnimationFrame(() => {
+    recomputePending = false;
+    paintMask();
+    detect();
+    renderStats();
+    renderTable();
+    renderHist();
+    if (S.sel) renderInspector();
+    draw();
+  });
+}
+
+function wire() {
+  for (const b of document.querySelectorAll(".segmented button")) {
+    b.addEventListener("click", () => {
+      S.mode = b.dataset.mode;
+      for (const o of document.querySelectorAll(".segmented button")) {
+        o.setAttribute("aria-pressed", String(o === b));
+      }
+      draw();
+    });
+  }
+  const toggle = (id, key, after) => el(id).addEventListener("click", () => {
+    S[key] = !S[key];
+    el(id).setAttribute("aria-pressed", String(S[key]));
+    (after || draw)();
+  });
+  toggle("tgMarks", "marks");
+  toggle("tgMask", "mask");
+  toggle("tgSampling", "sampling");
+
+  el("tNfa").addEventListener("input", (e) => { S.tNfa = parseFloat(e.target.value); recompute(); });
+  el("opac").addEventListener("input", (e) => {
+    S.opacity = parseInt(e.target.value, 10) / 100;
+    if (S.mode !== "blend") {
+      S.mode = "blend";
+      for (const o of document.querySelectorAll(".segmented button")) {
+        o.setAttribute("aria-pressed", String(o.dataset.mode === "blend"));
+      }
+    }
+    renderStats(); draw();
+  });
+
+  el("zIn").addEventListener("click", () => centreZoom(1.6));
+  el("zOut").addEventListener("click", () => centreZoom(1 / 1.6));
+  el("zRe").addEventListener("click", () => { fit(); draw(); });
+  el("btnFit").addEventListener("click", () => { fit(); draw(); });
+
+  view.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const r = view.getBoundingClientRect();
+    zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.0016));
+  }, { passive: false });
+
+  let drag = null;
+  view.addEventListener("pointerdown", (e) => {
+    view.setPointerCapture(e.pointerId);
+    drag = { x: e.clientX, y: e.clientY, tx: S.tx, ty: S.ty, moved: 0 };
+    view.classList.add("dragging");
+  });
+  view.addEventListener("pointermove", (e) => {
+    if (drag) {
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
+      S.tx = drag.tx + dx; S.ty = drag.ty + dy;
+      draw();
+    }
+    hoverReadout(e);
+  });
+  view.addEventListener("pointerup", (e) => {
+    const wasDrag = drag && drag.moved > 4;
+    drag = null;
+    view.classList.remove("dragging");
+    if (wasDrag) return;
+    const p = pointerPixel(e);
+    let best = null, bestD = 18 * 18;
+    for (const d of S.dets) {
+      const [sx2, sy2] = toScreen(d.row, d.col);
+      const dd = (sx2 - p.x) ** 2 + (sy2 - p.y) ** 2;
+      if (dd < bestD) { bestD = dd; best = d; }
+    }
+    if (best) select(best.row, best.col, best.id);
+    else select(p.row, p.col, null);
+  });
+  view.addEventListener("pointerleave", () => { el("cursor").hidden = true; });
+
+  view.tabIndex = 0;
+  view.addEventListener("keydown", (e) => {
+    const pan = e.shiftKey ? 120 : 40;
+    const keys = { ArrowLeft: [pan, 0], ArrowRight: [-pan, 0], ArrowUp: [0, pan], ArrowDown: [0, -pan] };
+    if (keys[e.key]) { S.tx += keys[e.key][0]; S.ty += keys[e.key][1]; draw(); e.preventDefault(); }
+    else if (e.key === "+" || e.key === "=") centreZoom(1.6);
+    else if (e.key === "-") centreZoom(1 / 1.6);
+    else if (e.key === "0") { fit(); draw(); }
+  });
+
+  el("detBody").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-id]");
+    if (!tr) return;
+    const d = S.dets.find((x) => x.id === Number(tr.dataset.id));
+    if (d) { flyTo(d); view.scrollIntoView({ behavior: "smooth", block: "center" }); }
+  });
+
+  const rerun = () => { if (S.live) requestRun(); else { renderStats(); renderSheet(); if (S.sel) renderInspector(); } };
+  el("tShadow").addEventListener("input", (e) => { S.tShadow = parseInt(e.target.value, 10); renderStats(); });
+  el("tHub").addEventListener("input", (e) => { S.tHub = parseInt(e.target.value, 10); renderStats(); });
+  el("tShadow").addEventListener("change", rerun);
+  el("tHub").addEventListener("change", rerun);
+
+  window.addEventListener("resize", () => {
+    sizeStage(); readTokens(); draw(); renderCompass(); renderHist();
+  });
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", () => {
+    readTokens(); draw(); renderCompass(); renderHist();
+    if (S.sel) renderInspector();
+  });
+  new MutationObserver(() => {
+    readTokens(); draw(); renderCompass(); renderHist();
+    if (S.sel) renderInspector();
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+}
+
+function centreZoom(f) {
+  const r = view.getBoundingClientRect();
+  zoomAt(r.width / 2, r.height / 2, f);
+}
+
+/* ---------- live detector (only when served by turbine_demo.py) ------- */
+
+async function probeLive() {
+  const fields = [el("fieldShadow"), el("fieldHub")];
+  if (!P.runtime.live) {
+    for (const f of fields) f.classList.add("off");
+    el("tShadow").disabled = true;
+    el("tHub").disabled = true;
+    el("liveNote").innerHTML = `The shadow and hub thresholds are baked into this build.
+      Run <code>demo/turbine_demo.py --serve</code> and these two sliders re-run the
+      detector for real; the significance cut above stays live either way.`;
+    return;
+  }
+  try {
+    const r = await fetch("api/ping", { cache: "no-store" });
+    S.live = (await r.json()).live === true;
+  } catch (err) { S.live = false; }
+  el("liveNote").innerHTML = S.live
+    ? `Live detector attached — moving either slider re-runs
+       <code>main_NFA</code> on the server and streams a new evidence map back.`
+    : "Live detector unreachable; showing the baked-in run.";
+}
+
+let runToken = 0;
+async function requestRun() {
+  const mine = ++runToken;
+  S.busy = true;
+  el("liveNote").innerHTML = "Re-running the detector…";
+  try {
+    const q = new URLSearchParams({
+      diff_s: S.tShadow, diff_h: S.tHub, t_nfa: S.tNfa,
+      heights: P.geometry.heights.join(","),
+    });
+    const res = await fetch(`api/detect?${q}`, { cache: "no-store" });
+    const data = await res.json();
+    if (mine !== runToken) return;
+    const raw = await decode(data.nfa.uri);
+    nfa = unpack(raw, data.nfa.low, data.nfa.high);
+    P.nfa = data.nfa;
+    S.hist = data.histogram;
+    S.stats = data.stats;
+    S.geom = data.geometry;
+    paintHeat();
+    recompute();
+    renderCompass();
+    renderSheet();
+    el("liveNote").innerHTML = `Re-ran <code>main_NFA</code> in
+      <b>${data.runtime.seconds} s</b> with diff_s ${S.tShadow}, diff_h ${S.tHub}.`;
+  } catch (err) {
+    el("liveNote").textContent = "The live detector did not answer; keeping the previous map.";
+  } finally {
+    S.busy = false;
+  }
+}
+
+/* ---------- boot ------------------------------------------------------ */
+
+async function main() {
+  el("tNfa").value = String(S.tNfa);
+  el("opac").value = String(Math.round(S.opacity * 100));
+  el("tShadow").value = String(S.tShadow);
+  el("tHub").value = String(S.tHub);
+
+  await loadRasters();
+  paintBase();
+  paintHeat();
+  paintMask();
+  detect();
+  sizeStage();
+  fit();
+  wire();
+  renderStats();
+  renderCompass();
+  renderHist();
+  renderTable();
+  renderSheet();
+  renderInspector();
+  draw();
+  probeLive();
+
+  // Open on the whole scene, with the strongest candidate already loaded in the
+  // inspector so the panel is showing real numbers rather than a placeholder.
+  if (S.dets.length) select(S.dets[0].row, S.dets[0].col, S.dets[0].id);
+
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!reduce) {
+    setInterval(() => {
+      if (!S.sel) return;
+      S.step++;
+      renderInspector();
+    }, 900);
+  }
+}
+
+main().catch((err) => {
+  el("inspBody").textContent = `Could not build the visual: ${err.message}`;
+  console.error(err);
+});
+})();
+</script>
