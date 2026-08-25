@@ -12,9 +12,12 @@ python3 -m venv .venv
 ```
 
 That detects turbines in the bundled 23 × 15 km scene (`band2_masked.tif`,
-southern New South Wales, April 2024), writes `demo/out/index.html` and opens
-it. Without `--serve` you get the same page as a single self-contained file you
-can mail to someone.
+Boco Rock area, southern New South Wales, April 2024), writes
+`demo/out/index.html` and opens it. Without `--serve` you get the same page as a
+single self-contained file you can mail to someone.
+
+`demo/fetch_scene.py` cuts a fresh scene out of the public Sentinel-2 archive if
+you want to point the detector somewhere else — see *Fetching a scene* below.
 
 ## What the page does
 
@@ -32,6 +35,53 @@ full scene) and streams a new evidence map back into the canvas.
 
 Every run also writes `detections.csv` and `detections.geojson` next to the
 page, so candidates open straight in QGIS.
+
+## Fetching a scene
+
+```
+pip install -r demo/requirements-fetch.txt
+
+python3 demo/fetch_scene.py --lat -34.5753 --lon 148.8701 --km 14 \
+    --year 2024 --months 5,6,7,8 --name ryepark
+python3 demo/turbine_demo.py --image demo/scenes/ryepark.tif \
+    --meta demo/scenes/ryepark_meta.txt --name "Rye Park, NSW" --serve
+```
+
+No credentials: the Element 84 `sentinel-cogs` bucket is public. The fetcher
+reads only the window it needs out of a 10980 × 10980 COG, pulls the per-band
+viewing angles from `granule_metadata.xml`, and writes the `gdalinfo`-style
+sidecar the loader expects. Three NSW scenes that work well:
+
+| Scene | Centre | Acquisition |
+| --- | --- | --- |
+| Rye Park | `--lat -34.5753 --lon 148.8701` | S2B, 22 Jun 2024, sun 25° |
+| Silverton | `--lat -31.8185 --lon 141.2561` | S2A, 9 Jun 2024, sun 29° |
+| Lake George | `--lat -35.0914 --lon 149.5134` | S2A, 28 May 2024, sun 28° |
+
+Ask for winter months in the southern hemisphere. A 25° sun throws a 170 m
+shadow off an 80 m hub where a summer 65° sun throws 37 m — under four pixels,
+barely enough to sample. Sun elevation, not image quality, is what decides
+whether this detector has anything to work with.
+
+Three things the fetcher has to get right:
+
+- **Scene choice is a window question, not a tile question.** `eo:cloud_cover`
+  describes 12 000 km²; a 14 km window can be solid cloud inside a tile
+  reporting 0.3%, and a tile that is 18% empty because the swath clipped its
+  corner can still cover the window completely. Candidates are screened by
+  reading the same footprint out of the 20 m `SCL.tif` classification band and
+  counting cloud, shadow, cirrus and no-data pixels there.
+- **Lowest sun first.** Among windows that pass, the fetcher takes the lowest
+  sun elevation rather than the lowest cloud — longest shadow wins.
+- **The MGRS tile can be one band off.** A point within a few kilometres of a
+  latitude-band edge converts to a square the archive files under the
+  neighbouring band: Silverton, at 31.93°S, converts to `54JWK` while its
+  imagery lives under `54HWK`. The fetcher walks the ring of neighbouring tiles
+  and keeps the first whose raster actually contains the point, rather than
+  silently clipping a window to the edge of the wrong tile.
+
+Scenes land in `demo/scenes/`, which is git-ignored — the commands above
+reproduce them exactly, including the acquisition, via `--scene`.
 
 ## Options
 
@@ -77,10 +127,12 @@ exactly; that is why its recomputed NFA equals the map's to the last digit.
 ## Layout
 
 ```
-demo/pipeline.py      scene + metadata parsing, geometry, detection, raster packing
-demo/turbine_demo.py  CLI: builds the page, optionally serves it with a live detector
-demo/template.html    the page itself (styles, markup, viewer); __PAYLOAD__ is injected
-demo/requirements.txt floating dependencies for a current Python
+demo/pipeline.py             scene + metadata parsing, geometry, detection, raster packing
+demo/turbine_demo.py         CLI: builds the page, optionally serves it with a live detector
+demo/template.html           the page itself; __TITLE__ and __PAYLOAD__ are injected
+demo/fetch_scene.py          cuts a new scene out of the public Sentinel-2 COG archive
+demo/requirements.txt        floating dependencies for a current Python
+demo/requirements-fetch.txt  extra dependencies for fetch_scene.py only
 ```
 
 The detector itself is untouched: `pipeline.py` calls

@@ -118,10 +118,19 @@ def build_payload(args) -> tuple[dict, dict]:
     return payload, state
 
 
+def page_title(name: str) -> str:
+    """One page per scene, so the scene names the page."""
+    name = (name or "").strip()
+    if not name or name.lower().endswith(".tif"):
+        return "Turbine Shadow Census"
+    return f"{name.split(',')[0].strip()} Shadow Census"
+
+
 def render_html(payload: dict, standalone: bool) -> str:
     with open(TEMPLATE) as fh:
         fragment = fh.read()
     data = json.dumps(payload, separators=(",", ":"))
+    fragment = fragment.replace("__TITLE__", page_title(payload["scene"]["name"]))
     fragment = fragment.replace("__PAYLOAD__", data)
     if not standalone:
         return fragment

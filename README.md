@@ -16,6 +16,16 @@ python3 -m venv .venv
 .venv/bin/python demo/turbine_demo.py --serve
 ```
 
-See [`demo/README.md`](demo/README.md) for the options and for three metadata
-gotchas the demo handles (UTM hemisphere parsing, disagreeing acquisition
-timestamps, and the hub test's comparison points).
+`demo/fetch_scene.py` cuts a fresh window out of the public Sentinel-2 archive
+if you want to point the detector somewhere else — no credentials needed:
+
+```
+.venv/bin/pip install -r demo/requirements-fetch.txt
+.venv/bin/python demo/fetch_scene.py --lat -34.5753 --lon 148.8701 --km 14 \
+    --year 2024 --months 5,6,7,8 --name ryepark
+```
+
+See [`demo/README.md`](demo/README.md) for the options and for the metadata
+gotchas both scripts handle (UTM hemisphere parsing, disagreeing acquisition
+timestamps, the hub test's comparison points, window-level cloud screening and
+MGRS tiles that sit one latitude band away from where a point converts).
