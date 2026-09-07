@@ -1,13 +1,55 @@
 # Land-clearing detection from Sentinel-1 — NSW, Australia
 
-Two runnable pipelines over New South Wales, both built on published,
-peer-reviewed change-detection algorithms rather than new ones. Everything runs
-server-side in Google Earth Engine — no bulk downloads, no SNAP preprocessing.
+Three runnable pipelines over New South Wales, all built on published,
+peer-reviewed change-detection algorithms rather than new ones. One runs locally
+with nothing but Python; two run server-side in Google Earth Engine. No bulk
+downloads and no SNAP preprocessing in any of them.
 
-| Pipeline | Algorithm | Cover types | Use it when |
+| Pipeline | Algorithm | Runs on | Use it when |
 | --- | --- | --- | --- |
-| [`omnibus_s1/`](omnibus_s1/) | Sequential omnibus Wishart test (Conradsen et al. 2016) | Forest, woodland | You want the highest-confidence woody clearing map, with dated changes, from radar alone |
-| [`ccdc/`](ccdc/) | CCDC (Zhu & Woodcock 2014) on S1 + S2 stacks | Forest, woodland, **grassland** | You need one product across the whole cover gradient |
+| [`local_s1/`](local_s1/) | Sequential omnibus Wishart test, in numpy | **Nothing but Python** | You have no Earth Engine account, or want a self-contained reproducible run. This is the only pipeline whose results below were actually executed. |
+| [`omnibus_s1/`](omnibus_s1/) | Sequential omnibus Wishart test (Conradsen et al. 2016) | Earth Engine | You want the same method at scale over many AOIs, server-side |
+| [`ccdc/`](ccdc/) | CCDC (Zhu & Woodcock 2014) on S1 + S2 stacks | Earth Engine | You need forest, woodland **and grassland** in one product |
+
+## Status: what has actually been run
+
+`local_s1/` has been executed end to end on real data and validated against a
+clearing event near Cobar. `omnibus_s1/` and `ccdc/` are reviewed but
+**unexecuted** -- they were written in an environment that could not
+authenticate to Earth Engine. Treat them as untested until you run them.
+
+### Validated detection, Cobar NSW, 2023
+
+30 acquisitions, relative orbit 16, 89 m pixels. Detected a **24.98 ha patch at
+(145.7917, -31.5427), first flagged 2023-09-25**.
+
+Independently established from the imagery: a 33 ha patch at (145.7920,
+-31.5431) that tracks surrounding woodland to within 0.3 dB for nine months,
+then drops 3.5 dB between 13 September and 7 October and stays down. The
+detection lands **60 m away** -- under one pixel -- in the correct interval.
+
+![Cobar time series](results/cobar_town_timeseries.png)
+
+| AOI | Woody | Raw negative change | Clearing | Patches |
+| --- | --- | --- | --- | --- |
+| `cobar_town` | 33,089 ha | 255 ha | **35.1 ha** | 4 |
+| `cobar_e` | 39,134 ha | 254 ha | 3.4 ha | 1 |
+| `cobar_ne` | 40,944 ha | 44 ha | 0.0 ha | 0 |
+| `cobar_sw` | 39,929 ha | 4 ha | 0.0 ha | 0 |
+| `pilliga` | 22,544 ha | 2,847 ha | 0.0 ha | 0 |
+
+Full run parameters and per-interval breakdowns are in [`results/`](results/).
+
+Pilliga is instructive: 2,847 ha of raw negative change, none surviving. That
+AOI is 46% grassland and cropland, where pasture and crop cycling produce real
+backscatter drops. Restricting to woody cover and requiring three connected
+pixels removes all of it.
+
+**Read these numbers as a floor, not an accuracy figure.** Recall was measured
+at 83% against a single event, with labels derived from the same imagery rather
+than an independent source. Events under the 2 ha mapping unit are invisible
+and partially-cleared paddocks get clipped. A defensible accuracy figure needs
+SLATS.
 
 ## Why two
 
@@ -46,12 +88,69 @@ assessable*, not *no clearing*. The CLI warns when you do this.
 ## Layout
 
 ```
+local_s1/     catalog.py (AWS scene discovery), annotation.py (geolocation grid
+              + calibration LUT), reader.py (geocoded windowed reads),
+              worldcover.py, omnibus_np.py (numpy algorithm), run.py, figures.py
 common/       AOI presets, woody masks and cover strata, area stats, validation
 omnibus_s1/   omnibus.py (algorithm core, ported verbatim), s1.py, clearing.py, detect.py
 ccdc/         collections.py (S1/S2 stacks), segmentation.py, rules.py, detect.py
 notebooks/    nsw_omnibus_s1.ipynb, nsw_ccdc_multicover.ipynb
 tests/        offline checks that need no Earth Engine credentials
 ```
+
+## Running without Earth Engine
+
+`local_s1/` reads ESA Sentinel-1 GRD straight from the public AWS mirror, which
+lists and serves **anonymously** -- no credentials, no requester-pays. The
+measurement rasters are ~600 MB but internally tiled at 1024x1024, so a small
+AOI window is an HTTPS range read of a few MB in about a second. ESA WorldCover
+comes from its own public bucket the same way. Nothing is downloaded in full.
+
+```bash
+pip install -r land_clearing/requirements.txt
+python -m land_clearing.local_s1.run --bbox 145.75 -31.60 145.95 -31.40 \
+    --start 2023-01-01 --end 2024-01-01 --orbit 16 \
+    --multilook 8 --min-mmu-ha 2 --outdir out_cobar
+python -m land_clearing.local_s1.figures out_cobar
+```
+
+### Choosing --multilook
+
+This is the parameter that decides whether the detector works. At 10 m the
+per-pixel speckle standard deviation is ~2.1 dB, which swamps the 1-2 dB step
+that clearing sparse woody vegetation produces. Measured against the Cobar
+event, at alpha=0.01:
+
+| multilook | pixel | ENL | recall | false positive |
+| --- | --- | --- | --- | --- |
+| 1 | 11 m | 4.40 | 26.0% | 0.24% |
+| 3 | 33 m | 6.17 | 30.4% | 0.11% |
+| 5 | 56 m | 8.78 | 57.5% | 0.22% |
+| 8 | 89 m | 11.35 | 83.3% | 0.18% |
+
+Recall triples while false positives fall -- the signature of a purely
+speckle-limited problem. 8 is calibrated for sparse mulga and chenopod scrub;
+closed-canopy clearing gives a much larger step and needs far less smoothing,
+so the default is 5.
+
+Two traps worth knowing about:
+
+* **ENL is not nominal x N^2.** GRD is posted at 10 m from ~20 m resolution, so
+  neighbouring pixels are correlated and 5x5 measures ENL ~15, not 110.
+  Assuming 110 makes the test treat speckle as signal. The calibrated table is
+  used by default; `--estimate-enl` estimates per AOI but is scene dependent
+  (it inflates over homogeneous ground, and once produced 27,860 ha of
+  "clearing" in stable woodland).
+* **The mapping unit must exceed a pixel.** At 89 m a pixel is 0.79 ha, so the
+  0.5 ha default would silently stop enforcing spatial coherence. That
+  coherence requirement is what turns a 0.18% per-pixel false-positive rate
+  into a near-zero patch-level one. `run.py` warns if the MMU falls under two
+  pixels.
+
+`--normalise` rescales each date to a common level over the woody baseline,
+removing basin-wide moisture shifts. Off by default: measured against the Cobar
+event it cut recall from 83% to 14% while taking rain-driven false positives
+only from 0.1% to 0.0%.
 
 ## Setup
 
