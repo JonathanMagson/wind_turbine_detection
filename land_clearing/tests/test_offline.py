@@ -162,6 +162,28 @@ def test_worldcover_tile_naming():
         'ESA_WorldCover_10m_2021_v200_N00E000_Map.tif'
 
 
+def test_worldcover_tiles_for_bbox_spans_boundaries():
+    # A 3-degree tile boundary runs along latitude -30, straight through the
+    # Brigalow Belt, so a NSW AOI can straddle two tiles. Reading only the
+    # centre tile silently returns wrong land cover for the other half.
+    straddling = (149.50, -30.05, 149.70, -29.85)
+    tiles = worldcover.tiles_for_bbox(straddling)
+    assert len(tiles) == 2, tiles
+    names = {worldcover._tile_name_from_corner(*t) for t in tiles}
+    assert names == {'ESA_WorldCover_10m_2021_v200_S30E147_Map.tif',
+                     'ESA_WorldCover_10m_2021_v200_S33E147_Map.tif'}
+
+
+def test_worldcover_tiles_for_bbox_single_tile():
+    inside = (149.50, -30.55, 149.70, -30.35)
+    assert len(worldcover.tiles_for_bbox(inside)) == 1
+
+
+def test_worldcover_tiles_for_bbox_spans_four():
+    # Crossing both a longitude and a latitude boundary needs all four.
+    assert len(worldcover.tiles_for_bbox((148.10, -31.15, 150.95, -29.20))) == 4
+
+
 def test_omnibus_np_detects_an_injected_change_at_the_right_interval():
     import numpy as np
     rng = np.random.default_rng(0)
