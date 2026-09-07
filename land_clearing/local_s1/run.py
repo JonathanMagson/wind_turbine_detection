@@ -316,9 +316,15 @@ def main(argv=None):
                   [first_neg_masked, res['fmap'], classes.astype(np.int16)],
                   ['first_negative_interval', 'n_changes', 'worldcover'],
                   bbox, pixel_deg)
+    # The whole multi-looked stack is saved, not just the endpoints: at 89 m a
+    # 30-date dual-pol series is only a few MB, and vectorise.py needs the full
+    # series to measure how far backscatter fell at the break and whether it
+    # stayed down.
     np.savez_compressed(os.path.join(args.outdir, 'arrays.npz'),
                         first_neg=first_neg_masked, fmap=res['fmap'],
                         classes=classes, woody=woody,
+                        stack=np.stack(stack).astype(np.float32),
+                        dates=np.array(dates),
                         vv_first=stack[0][0], vv_last=stack[-1][0],
                         vh_first=stack[0][1], vh_last=stack[-1][1])
 

@@ -38,7 +38,30 @@ detection lands **60 m away** -- under one pixel -- in the correct interval.
 | `cobar_sw` | 39,929 ha | 4 ha | 0.0 ha | 0 |
 | `pilliga` | 22,544 ha | 2,847 ha | 0.0 ha | 0 |
 
-Full run parameters and per-interval breakdowns are in [`results/`](results/).
+Full run parameters and per-interval breakdowns are in [`results/`](results/),
+along with the detections as GeoJSON and a data dictionary for the attributes.
+
+### Exporting polygons
+
+```bash
+python -m land_clearing.local_s1.vectorise fin_cobar_town fin_cobar_e \
+    --outdir shapefiles --name nsw_clearing_2023
+```
+
+Writes a zipped ESRI Shapefile (with `.prj`), a GeoPackage and GeoJSON.
+Geometry is EPSG:4326; areas are computed in EPSG:3577 (Australian Albers).
+Two attributes carry most of the triage value:
+
+* `persist` -- fraction of acquisitions after the break that stay 1 dB or more
+  below the pre-break mean. Clearing is permanent so real events sit near 1.0,
+  while a transient dip from rainfall recovers and scores low.
+* `rain_flag` -- set to `check` when the AOI-wide woody median also fell more
+  than 1 dB in the same interval, i.e. the whole area darkened at once. On the
+  2023 runs this correctly flags the July detections, which coincide with a
+  wet-to-dry transition, while leaving the validated September event clear.
+
+See [`results/shapefile_data_dictionary.txt`](results/shapefile_data_dictionary.txt)
+for every field.
 
 Pilliga is instructive: 2,847 ha of raw negative change, none surviving. That
 AOI is 46% grassland and cropland, where pasture and crop cycling produce real

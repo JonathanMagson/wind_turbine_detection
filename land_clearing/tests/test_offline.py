@@ -162,6 +162,29 @@ def test_worldcover_tile_naming():
         'ESA_WorldCover_10m_2021_v200_N00E000_Map.tif'
 
 
+def test_vectorise_preserves_area_of_diagonally_touching_pixels():
+    # label() uses 8-connectivity, so rasterio's shapes() must too. With the
+    # default connectivity=4, a component whose parts touch only at a corner is
+    # split into separate polygons and keeping the largest silently drops area.
+    import numpy as np
+    from rasterio.features import shapes
+    from rasterio.transform import from_origin
+    from scipy.ndimage import label
+    from shapely.geometry import shape as shapely_shape
+    from shapely.ops import unary_union
+
+    mask = np.zeros((6, 6), dtype=bool)
+    mask[1, 1] = mask[2, 2] = mask[3, 3] = True      # a diagonal chain
+    lab, n = label(mask, structure=np.ones((3, 3)))
+    assert n == 1, 'expected one 8-connected component'
+
+    transform = from_origin(0, 0, 1, 1)
+    parts = [shapely_shape(g) for g, v in
+             shapes(lab.astype(np.int32), mask=mask, transform=transform,
+                    connectivity=8) if int(v) == 1]
+    assert abs(unary_union(parts).area - 3.0) < 1e-9, 'area must equal 3 pixels'
+
+
 def test_worldcover_tiles_for_bbox_spans_boundaries():
     # A 3-degree tile boundary runs along latitude -30, straight through the
     # Brigalow Belt, so a NSW AOI can straddle two tiles. Reading only the
