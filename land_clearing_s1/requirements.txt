@@ -1,0 +1,4 @@
+earthengine-api>=1.0
+# Optional, for the notebook only:
+geemap>=0.32
+folium>=0.16
