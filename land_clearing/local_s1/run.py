@@ -39,7 +39,15 @@ def parse_args(argv=None):
                    help='per-test significance level (default 0.01)')
     p.add_argument('--median', action='store_true',
                    help='5x5 median filter on the omnibus P values')
-    p.add_argument('--enl', type=float, default=omnibus_np.ENL)
+    p.add_argument('--multilook', type=int, default=5,
+                   help='block-average NxN before testing (default 5, ~56 m). '
+                        'At 10 m the per-pixel speckle standard deviation is '
+                        '~2.1 dB, which swamps the 1-2 dB step that clearing '
+                        'sparse woody vegetation produces; 1 disables.')
+    p.add_argument('--enl', type=float,
+                   help='override the equivalent number of looks. By default '
+                        'it is estimated from the imagery and calibrated '
+                        'against the nominal 4.4 of the raw GRD product.')
     p.add_argument('--min-mmu-ha', type=float, default=0.5,
                    help='minimum mapping unit in hectares (0 disables)')
     p.add_argument('--woody-mask', action='store_true', default=True,
@@ -164,16 +172,43 @@ def main(argv=None):
     if len(stack) < 3:
         raise SystemExit('Only %d scenes read successfully.' % len(stack))
     dates = [s['startTime'][:10] for s in scenes]
+    print('stack: %d dates, %d x %d px at %.5f deg'
+          % (len(stack), stack[0].shape[1], stack[0].shape[2], args.pixel_deg),
+          file=sys.stderr)
+
+    # Multi-look, and work out how many looks that actually bought. The naive
+    # answer (nominal ENL x N^2) is badly wrong because GRD is posted at 10 m
+    # from ~20 m resolution, so neighbouring pixels are correlated. Estimating
+    # on both the raw and multi-looked stacks and taking the *ratio* cancels
+    # the correlation bias that affects both equally, then anchors the result
+    # to the product's known nominal ENL.
+    enl_raw_est = omnibus_np.estimate_enl(stack[:3])
+    if args.multilook > 1:
+        stack = [omnibus_np.multilook(im, args.multilook) for im in stack]
+    pixel_deg = args.pixel_deg * max(1, args.multilook)
     h, w = stack[0].shape[1:]
-    print('stack: %d dates, %d x %d px' % (len(stack), h, w), file=sys.stderr)
+
+    if args.enl is not None:
+        enl = args.enl
+        enl_note = 'user supplied'
+    elif args.multilook > 1:
+        enl_ml_est = omnibus_np.estimate_enl(stack[:3])
+        enl = omnibus_np.ENL * (enl_ml_est / enl_raw_est)
+        enl_note = ('estimated: raw %.2f, multi-looked %.2f, gain %.2fx'
+                    % (enl_raw_est, enl_ml_est, enl_ml_est / enl_raw_est))
+    else:
+        enl = omnibus_np.ENL
+        enl_note = 'nominal for IW GRDH'
+    print('multilook %dx -> %d x %d px at %.5f deg | ENL %.2f (%s)'
+          % (args.multilook, h, w, pixel_deg, enl, enl_note), file=sys.stderr)
 
     print('running the omnibus test...', file=sys.stderr)
-    res = tiled_change_maps(stack, args.alpha, args.median, args.enl, args.tile)
+    res = tiled_change_maps(stack, args.alpha, args.median, enl, args.tile)
 
     first_neg = first_negative_interval(res['bmap'])
     detections = first_neg > 0
 
-    classes = worldcover.read_aoi(bbox, args.pixel_deg)
+    classes = worldcover.read_aoi(bbox, pixel_deg)
     woody = worldcover.woody_mask(classes)
     clearing = detections & woody if args.woody_mask else detections
 
@@ -181,8 +216,8 @@ def main(argv=None):
     lat_mid = (bbox[1] + bbox[3]) / 2.0
     m_per_deg_lat = 111132.0
     m_per_deg_lon = 111320.0 * np.cos(np.radians(lat_mid))
-    pixel_area_ha = (args.pixel_deg * m_per_deg_lat) * \
-                    (args.pixel_deg * m_per_deg_lon) / 10000.0
+    pixel_area_ha = (pixel_deg * m_per_deg_lat) * \
+                    (pixel_deg * m_per_deg_lon) / 10000.0
 
     clearing = apply_mmu(clearing, args.min_mmu_ha, pixel_area_ha)
     first_neg_masked = np.where(clearing, first_neg, 0).astype(np.int16)
@@ -202,10 +237,13 @@ def main(argv=None):
         'relative_orbit': track,
         'n_scenes': len(stack),
         'dates': dates,
-        'grid': {'height': h, 'width': w, 'pixel_deg': args.pixel_deg,
+        'grid': {'height': h, 'width': w, 'pixel_deg': pixel_deg,
+                 'source_pixel_deg': args.pixel_deg,
+                 'multilook': args.multilook,
                  'pixel_area_ha': round(pixel_area_ha, 6)},
         'alpha': args.alpha,
-        'enl': args.enl,
+        'enl': round(enl, 3),
+        'enl_note': enl_note,
         'median_filter': args.median,
         'woody_mask': args.woody_mask,
         'min_mmu_ha': args.min_mmu_ha,
@@ -224,7 +262,7 @@ def main(argv=None):
     write_geotiff(os.path.join(args.outdir, 'clearing.tif'),
                   [first_neg_masked, res['fmap'], classes.astype(np.int16)],
                   ['first_negative_interval', 'n_changes', 'worldcover'],
-                  bbox, args.pixel_deg)
+                  bbox, pixel_deg)
     np.savez_compressed(os.path.join(args.outdir, 'arrays.npz'),
                         first_neg=first_neg_masked, fmap=res['fmap'],
                         classes=classes, woody=woody,

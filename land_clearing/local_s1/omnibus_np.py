@@ -138,3 +138,61 @@ def change_maps(im_list, median=False, alpha=0.01, m=ENL):
         count[changed] = 1
 
     return {'cmap': cmap, 'smap': smap, 'fmap': fmap, 'bmap': bmap}
+
+
+def multilook(image, factor):
+    """Block-average a (bands, H, W) image by ``factor`` in linear power.
+
+    Averaging must happen in linear power, not dB. Non-overlapping blocks are
+    used rather than a sliding boxcar, because overlapping windows leave
+    neighbouring output pixels correlated, which would violate the test's
+    independence assumption while appearing to add looks.
+    """
+    if factor <= 1:
+        return image
+    b, h, w = image.shape
+    h2, w2 = (h // factor) * factor, (w // factor) * factor
+    trimmed = image[:, :h2, :w2]
+    return trimmed.reshape(b, h2 // factor, factor,
+                           w2 // factor, factor).mean(axis=(2, 4))
+
+
+def estimate_enl(stack, mask=None, window=7, min_samples=500):
+    """Estimate the equivalent number of looks from the imagery itself.
+
+    For single-channel intensity (linear power) speckle, ENL = (mean/std)^2.
+    Computed on local windows and reduced by the median, because scene texture
+    only ever *adds* variance and so biases the estimate downward -- which is
+    the safe direction: understating ENL makes the change test stricter, not
+    more permissive.
+
+    Assuming a nominal ENL after multi-looking would be wrong here: Sentinel-1
+    GRD is posted at 10 m from roughly 20 m resolution, so neighbouring pixels
+    are correlated and an NxN block does not deliver N^2 independent looks.
+    """
+    from scipy.ndimage import uniform_filter
+
+    ratios = []
+    for image in stack:
+        for band in np.asarray(image, dtype=np.float64):
+            valid = np.isfinite(band) & (band > 0)
+            if mask is not None:
+                valid = valid & mask
+            if valid.sum() < min_samples:
+                continue
+            filled = np.where(valid, band, np.nan)
+            filled = np.nan_to_num(filled, nan=np.nanmedian(band[valid]))
+            mean = uniform_filter(filled, window)
+            mean_sq = uniform_filter(filled ** 2, window)
+            var = np.clip(mean_sq - mean ** 2, 1e-20, None)
+            enl_local = (mean ** 2) / var
+            # Drop window edge effects and non-finite values.
+            edge = window // 2 + 1
+            core = enl_local[edge:-edge, edge:-edge]
+            core_valid = valid[edge:-edge, edge:-edge]
+            sel = core[core_valid & np.isfinite(core)]
+            if sel.size:
+                ratios.append(np.median(sel))
+    if not ratios:
+        raise ValueError('Could not estimate ENL: no valid homogeneous samples.')
+    return float(np.median(ratios))
