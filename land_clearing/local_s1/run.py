@@ -53,6 +53,18 @@ def parse_args(argv=None):
     p.add_argument('--woody-mask', action='store_true', default=True,
                    help='restrict detections to WorldCover tree/shrub (default on)')
     p.add_argument('--no-woody-mask', dest='woody_mask', action='store_false')
+    p.add_argument('--estimate-enl', action='store_true',
+                   help='estimate ENL from this AOI instead of using the '
+                        'calibrated table. Scene dependent -- it inflates over '
+                        'homogeneous ground and makes the test too permissive.')
+    p.add_argument('--normalise', action='store_true',
+                   help='rescale each date to a common level over the woody '
+                        'baseline, removing basin-wide moisture shifts. Off by '
+                        'default: measured against a known clearing event it '
+                        'suppressed the rain interval only marginally further '
+                        'while cutting recall from 83%% to 14%%, because the '
+                        'calibrated ENL already keeps rain-driven false '
+                        'positives to 0.1%% of woody area.')
     p.add_argument('--tile', type=int, default=384,
                    help='tile size in pixels for the omnibus step')
     p.add_argument('--workers', type=int, default=5,
@@ -182,25 +194,41 @@ def main(argv=None):
     # on both the raw and multi-looked stacks and taking the *ratio* cancels
     # the correlation bias that affects both equally, then anchors the result
     # to the product's known nominal ENL.
-    enl_raw_est = omnibus_np.estimate_enl(stack[:3])
     if args.multilook > 1:
         stack = [omnibus_np.multilook(im, args.multilook) for im in stack]
     pixel_deg = args.pixel_deg * max(1, args.multilook)
     h, w = stack[0].shape[1:]
 
     if args.enl is not None:
-        enl = args.enl
-        enl_note = 'user supplied'
-    elif args.multilook > 1:
-        enl_ml_est = omnibus_np.estimate_enl(stack[:3])
-        enl = omnibus_np.ENL * (enl_ml_est / enl_raw_est)
-        enl_note = ('estimated: raw %.2f, multi-looked %.2f, gain %.2fx'
-                    % (enl_raw_est, enl_ml_est, enl_ml_est / enl_raw_est))
+        enl, enl_note = args.enl, 'user supplied'
+    elif args.estimate_enl:
+        raw = read_series(scenes[:1], bbox, args.pixel_deg, 1)[0]
+        base = omnibus_np.estimate_enl(raw)
+        enl = omnibus_np.ENL * (omnibus_np.estimate_enl(stack[:3]) / base)
+        enl_note = 'estimated from this AOI (scene dependent, see docstring)'
     else:
-        enl = omnibus_np.ENL
-        enl_note = 'nominal for IW GRDH'
+        enl = omnibus_np.calibrated_enl(args.multilook)
+        enl_note = 'calibrated table for multilook %d' % args.multilook
     print('multilook %dx -> %d x %d px at %.5f deg | ENL %.2f (%s)'
           % (args.multilook, h, w, pixel_deg, enl, enl_note), file=sys.stderr)
+
+    # Common-mode normalisation needs the woody baseline on the stack grid, so
+    # build it before the test rather than after.
+    classes_pre = worldcover.read_aoi(bbox, args.pixel_deg)
+    woody_pre_raw = worldcover.woody_mask(classes_pre)
+    if args.multilook > 1:
+        woody_pre = omnibus_np.multilook(
+            woody_pre_raw[None].astype(np.float64), args.multilook)[0][:h, :w] > 0.5
+    else:
+        woody_pre = woody_pre_raw[:h, :w]
+
+    norm_factors = None
+    if args.normalise:
+        ref = woody_pre if woody_pre.sum() > 100 else None
+        stack, norm_factors = omnibus_np.normalise_common_mode(stack, ref)
+        span = 10 * np.log10(norm_factors.max(axis=0) / norm_factors.min(axis=0))
+        print('common-mode normalisation: date levels spanned %s dB'
+              % np.round(span, 2), file=sys.stderr)
 
     print('running the omnibus test...', file=sys.stderr)
     res = tiled_change_maps(stack, args.alpha, args.median, enl, args.tile)
@@ -208,8 +236,22 @@ def main(argv=None):
     first_neg = first_negative_interval(res['bmap'])
     detections = first_neg > 0
 
-    classes = worldcover.read_aoi(bbox, pixel_deg)
-    woody = worldcover.woody_mask(classes)
+    # Read land cover at the source resolution and block-reduce onto the
+    # stack's grid. Rebuilding the grid at the coarse pixel size instead lets
+    # np.arange disagree with multilook()'s trimming by a row or column, and
+    # a block majority over 8x8 also beats sampling one 10 m pixel per 89 m
+    # cell.
+    classes_raw = worldcover.read_aoi(bbox, args.pixel_deg)
+    woody_raw = worldcover.woody_mask(classes_raw)
+    f = max(1, args.multilook)
+    if f > 1:
+        woody_frac = omnibus_np.multilook(woody_raw[None].astype(np.float64), f)[0]
+        woody = woody_frac[:h, :w] > 0.5
+        classes = classes_raw[::f, ::f][:h, :w]
+    else:
+        woody = woody_raw[:h, :w]
+        classes = classes_raw[:h, :w]
+    assert woody.shape == detections.shape, (woody.shape, detections.shape)
     clearing = detections & woody if args.woody_mask else detections
 
     # Pixel area from the local metre-per-degree scale.
@@ -250,11 +292,16 @@ def main(argv=None):
         'alpha': args.alpha,
         'enl': round(enl, 3),
         'enl_note': enl_note,
+        'common_mode_normalised': args.normalise,
+        'norm_level_span_db': (None if norm_factors is None else
+                               [round(float(x), 3) for x in
+                                10 * np.log10(norm_factors.max(axis=0)
+                                              / norm_factors.min(axis=0))]),
         'median_filter': args.median,
         'woody_mask': args.woody_mask,
         'min_mmu_ha': args.min_mmu_ha,
         'landcover_fractions': {k: round(v, 4)
-                                for k, v in worldcover.summarise(classes).items()},
+                                for k, v in worldcover.summarise(classes_raw).items()},
         'geolocation_fit_px': diags[0]['vv'] if diags else None,
         'aoi_area_ha': round(h * w * pixel_area_ha, 1),
         'woody_area_ha': round(int(woody.sum()) * pixel_area_ha, 1),

@@ -1,0 +1,143 @@
+{
+  "method": "sequential omnibus test (Conradsen et al. 2016), run locally",
+  "data": "ESA Sentinel-1 IW GRDH via the public AWS mirror, no Earth Engine",
+  "bbox": [
+    149.5,
+    -30.55,
+    149.7,
+    -30.35
+  ],
+  "relative_orbit": 9,
+  "n_scenes": 30,
+  "dates": [
+    "2023-01-04",
+    "2023-01-16",
+    "2023-01-28",
+    "2023-02-09",
+    "2023-02-21",
+    "2023-03-05",
+    "2023-03-17",
+    "2023-04-10",
+    "2023-04-22",
+    "2023-05-04",
+    "2023-05-16",
+    "2023-05-28",
+    "2023-06-09",
+    "2023-06-21",
+    "2023-07-03",
+    "2023-07-15",
+    "2023-07-27",
+    "2023-08-08",
+    "2023-08-20",
+    "2023-09-01",
+    "2023-09-13",
+    "2023-09-25",
+    "2023-10-07",
+    "2023-10-19",
+    "2023-10-31",
+    "2023-11-12",
+    "2023-11-24",
+    "2023-12-06",
+    "2023-12-18",
+    "2023-12-30"
+  ],
+  "grid": {
+    "height": 250,
+    "width": 250,
+    "pixel_deg": 0.0008,
+    "source_pixel_deg": 0.0001,
+    "multilook": 8,
+    "pixel_area_ha": 0.682552
+  },
+  "alpha": 0.01,
+  "enl": 12.257,
+  "enl_note": "estimated: raw 6.83, multi-looked 19.03, gain 2.79x",
+  "median_filter": false,
+  "woody_mask": true,
+  "min_mmu_ha": 2.0,
+  "landcover_fractions": {
+    "tree cover": 0.531,
+    "grassland": 0.3395,
+    "cropland": 0.1252,
+    "water": 0.0018,
+    "bare/sparse": 0.0016,
+    "built-up": 0.001
+  },
+  "geolocation_fit_px": {
+    "rms_line_px": 0.004,
+    "rms_pixel_px": 1.222,
+    "tie_points": 20
+  },
+  "aoi_area_ha": 42659.5,
+  "woody_area_ha": 22650.5,
+  "detected_clearing_ha": 42.318,
+  "negative_change_before_mask_ha": 3397.061,
+  "per_interval": {
+    "6": {
+      "from": "2023-03-05",
+      "to": "2023-03-17",
+      "pixels": 2,
+      "hectares": 1.365
+    },
+    "7": {
+      "from": "2023-03-17",
+      "to": "2023-04-10",
+      "pixels": 13,
+      "hectares": 8.873
+    },
+    "8": {
+      "from": "2023-04-10",
+      "to": "2023-04-22",
+      "pixels": 1,
+      "hectares": 0.683
+    },
+    "9": {
+      "from": "2023-04-22",
+      "to": "2023-05-04",
+      "pixels": 2,
+      "hectares": 1.365
+    },
+    "17": {
+      "from": "2023-07-27",
+      "to": "2023-08-08",
+      "pixels": 2,
+      "hectares": 1.365
+    },
+    "20": {
+      "from": "2023-09-01",
+      "to": "2023-09-13",
+      "pixels": 2,
+      "hectares": 1.365
+    },
+    "21": {
+      "from": "2023-09-13",
+      "to": "2023-09-25",
+      "pixels": 2,
+      "hectares": 1.365
+    },
+    "22": {
+      "from": "2023-09-25",
+      "to": "2023-10-07",
+      "pixels": 1,
+      "hectares": 0.683
+    },
+    "24": {
+      "from": "2023-10-19",
+      "to": "2023-10-31",
+      "pixels": 19,
+      "hectares": 12.968
+    },
+    "25": {
+      "from": "2023-10-31",
+      "to": "2023-11-12",
+      "pixels": 2,
+      "hectares": 1.365
+    },
+    "27": {
+      "from": "2023-11-24",
+      "to": "2023-12-06",
+      "pixels": 16,
+      "hectares": 10.921
+    }
+  }
+}

@@ -213,3 +213,58 @@ def estimate_enl(stack, mask=None, window=7, min_samples=500):
     if not ratios:
         raise ValueError('Could not estimate ENL: no valid homogeneous samples.')
     return float(np.median(ratios))
+
+
+# Calibrated equivalent number of looks per multi-look factor, measured in the
+# controlled experiment documented above. Used in preference to estimating per
+# AOI: the multi-look gain comes from the *sensor's* correlation structure, not
+# from the scene, whereas the local-window estimator is strongly scene
+# dependent -- it inflates over homogeneous ground (less texture to add
+# variance) and so made the test far too permissive on the most uniform AOIs,
+# where estimates ran from 12 to 30 for the same factor.
+CALIBRATED_ENL = {1: 4.40, 3: 6.17, 5: 8.78, 8: 11.35}
+
+
+def calibrated_enl(factor):
+    """Equivalent number of looks for a multi-look factor, log-interpolated."""
+    factor = max(1, int(factor))
+    if factor in CALIBRATED_ENL:
+        return CALIBRATED_ENL[factor]
+    xs = sorted(CALIBRATED_ENL)
+    ys = [CALIBRATED_ENL[x] for x in xs]
+    return float(np.interp(np.log(factor), np.log(xs), ys))
+
+
+def normalise_common_mode(stack, mask=None):
+    """Remove date-to-date global radiometric shifts. Returns (stack, factors).
+
+    A rain front changes backscatter across a whole scene at once. That is a
+    real change and the omnibus test flags it correctly -- over an entire AOI,
+    which is useless for clearing. In one Cobar run a single wet-to-dry
+    transition produced 20,454 ha of "clearing".
+
+    Each date and polarisation is rescaled so its median over ``mask``
+    (normally the woody baseline) matches the series geometric mean. Localised
+    change survives because the median is robust: clearing is a small fraction
+    of any sensible AOI, so it barely moves the reference level, while a
+    basin-wide moisture shift moves it almost entirely.
+    """
+    stack = [np.asarray(im, dtype=np.float64) for im in stack]
+    n_bands = stack[0].shape[0]
+    levels = np.empty((len(stack), n_bands))
+    for t, im in enumerate(stack):
+        for b in range(n_bands):
+            band = im[b]
+            sel = np.isfinite(band) & (band > 0)
+            if mask is not None:
+                sel = sel & mask
+            levels[t, b] = np.median(band[sel]) if sel.any() else np.nan
+
+    target = np.exp(np.nanmean(np.log(levels), axis=0))
+    out, factors = [], []
+    for t, im in enumerate(stack):
+        f = np.where(np.isfinite(levels[t]) & (levels[t] > 0),
+                     target / levels[t], 1.0)
+        out.append(im * f[:, None, None])
+        factors.append(f)
+    return out, np.array(factors)
