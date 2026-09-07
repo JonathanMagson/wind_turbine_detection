@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """End-to-end Sentinel-1 land-clearing detection for a NSW AOI.
 
-Example:
-    python detect.py --aoi moree --start 2023-01-01 --end 2024-01-01 \
+Woody vegetation only -- see ``land_clearing.ccdc`` for a product that also
+covers grassland.
+
+Run from the repository root:
+    python -m land_clearing.omnibus_s1.detect --aoi moree --start 2023-01-01 --end 2024-01-01 \
         --project my-gee-project --export drive
 
 Everything except the small summary reductions runs server-side in Earth Engine,
@@ -15,16 +18,17 @@ import sys
 
 import ee
 
-import nsw
-import omnibus
-import s1
+from ..common import aois, masks, stats
+from . import clearing as clearing_mod
+from . import omnibus
+from . import s1
 
 
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     aoi = p.add_mutually_exclusive_group(required=True)
-    aoi.add_argument('--aoi', choices=sorted(nsw.AOIS),
+    aoi.add_argument('--aoi', choices=sorted(aois.AOIS),
                      help='named NSW AOI preset')
     aoi.add_argument('--bbox', type=float, nargs=4, metavar=('W', 'S', 'E', 'N'),
                      help='explicit bounding box in EPSG:4326')
@@ -41,7 +45,7 @@ def parse_args(argv=None):
                    help='per-test significance level (default 0.01)')
     p.add_argument('--median', action='store_true',
                    help='5x5 median filter the change maps')
-    p.add_argument('--woody-mask', default='worldcover', choices=nsw.WOODY_MASKS)
+    p.add_argument('--woody-mask', default='worldcover', choices=masks.WOODY_MASKS)
     p.add_argument('--tree-cover-pct', type=int, default=20,
                    help='canopy threshold for the hansen mask (default 20)')
     p.add_argument('--min-mmu-ha', type=float, default=0.5,
@@ -65,7 +69,7 @@ def main(argv=None):
     else:
         ee.Initialize()
 
-    aoi = nsw.aoi_geometry(name=args.aoi, bbox=args.bbox)
+    aoi = aois.aoi_geometry(name=args.aoi, bbox=args.bbox)
 
     im_list, dates, rel_orbit = s1.build_series(
         aoi, args.start, args.end,
@@ -82,13 +86,13 @@ def main(argv=None):
         omnibus.change_maps(im_list, median=args.median, alpha=args.alpha))
     bmap = ee.Image(result.get('bmap'))
 
-    mask = nsw.woody_mask(args.woody_mask, tree_cover_pct=args.tree_cover_pct)
-    clearing = nsw.clearing_from_bmap(
+    mask = masks.woody_mask(args.woody_mask, tree_cover_pct=args.tree_cover_pct)
+    clearing = clearing_mod.clearing_from_bmap(
         bmap, n_intervals, mask=mask, min_mmu_ha=args.min_mmu_ha,
         scale=args.scale)
 
-    total_ha = nsw.cleared_area_ha(clearing, aoi, scale=args.scale)
-    per_interval = nsw.area_by_interval(clearing, aoi, n_intervals,
+    total_ha = stats.cleared_area_ha(clearing, aoi, scale=args.scale)
+    per_interval = stats.area_by_interval(clearing, aoi, n_intervals,
                                         scale=args.scale)
 
     intervals = [{'interval': i,

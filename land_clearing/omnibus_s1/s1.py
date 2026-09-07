@@ -59,10 +59,11 @@ def best_relative_orbit(coll):
 
 def to_linear_power(image):
     """dB sigma0 -> linear power, keeping only VV and VH."""
-    return (image.select('VV', 'VH')
-            .multiply(ee.Image.constant(math.log(10.0) / 10.0))
-            .exp()
-            .copyProperties(image, ['system:time_start']))
+    out = (image.select('VV', 'VH')
+           .multiply(ee.Image.constant(math.log(10.0) / 10.0))
+           .exp())
+    # copyProperties returns an Element, not an Image; cast it back.
+    return ee.Image(out.copyProperties(image, ['system:time_start']))
 
 
 def build_series(aoi, start, end, orbit_pass='DESCENDING', relative_orbit=None,

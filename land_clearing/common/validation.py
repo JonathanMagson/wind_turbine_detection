@@ -30,7 +30,7 @@ import sys
 
 import ee
 
-import nsw
+from . import aois
 
 
 def hansen_reference(year, aoi):
@@ -83,7 +83,7 @@ def parse_args(argv=None):
     p.add_argument('--reference-asset', help='table asset id when --reference asset')
     p.add_argument('--year', type=int, help='calendar year when --reference hansen')
     aoi = p.add_mutually_exclusive_group(required=True)
-    aoi.add_argument('--aoi', choices=sorted(nsw.AOIS))
+    aoi.add_argument('--aoi', choices=sorted(aois.AOIS))
     aoi.add_argument('--bbox', type=float, nargs=4, metavar=('W', 'S', 'E', 'N'))
     p.add_argument('--project')
     p.add_argument('--scale', type=int, default=30,
@@ -99,7 +99,7 @@ def main(argv=None):
     else:
         ee.Initialize()
 
-    aoi = nsw.aoi_geometry(name=args.aoi, bbox=args.bbox)
+    aoi = aois.aoi_geometry(name=args.aoi, bbox=args.bbox)
     detected = ee.Image(args.detected)
 
     if args.reference == 'hansen':
