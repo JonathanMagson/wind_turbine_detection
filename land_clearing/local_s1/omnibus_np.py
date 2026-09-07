@@ -140,6 +140,23 @@ def change_maps(im_list, median=False, alpha=0.01, m=ENL):
     return {'cmap': cmap, 'smap': smap, 'fmap': fmap, 'bmap': bmap}
 
 
+# Detection limit, measured over sparse mulga near Cobar against a clearing
+# event confirmed by its persistent 3.5 dB divergence from surrounding
+# woodland (33 ha, September-October 2023). Recall of that event, and the
+# false-positive rate over known-stable woody vegetation, both at alpha=0.01:
+#
+#   multilook  pixel   ENL    recall   false positive
+#           1    11 m  4.40    26.0%            0.24%
+#           3    33 m  6.17    30.4%            0.11%
+#           5    56 m  8.78    57.5%            0.22%
+#           8    89 m 11.35    83.3%            0.18%
+#
+# Recall triples while the false-positive rate falls, which is what a purely
+# speckle-limited problem looks like: the extra looks buy sensitivity at no
+# cost in specificity. Closed-canopy clearing gives a much larger step and
+# needs far less multi-looking; 8 is calibrated for the sparse arid case.
+
+
 def multilook(image, factor):
     """Block-average a (bands, H, W) image by ``factor`` in linear power.
 

@@ -219,6 +219,12 @@ def main(argv=None):
     pixel_area_ha = (pixel_deg * m_per_deg_lat) * \
                     (pixel_deg * m_per_deg_lon) / 10000.0
 
+    if args.min_mmu_ha and args.min_mmu_ha < 2 * pixel_area_ha:
+        print('WARNING: minimum mapping unit %.2f ha is under two pixels at '
+              '%.0f m (%.2f ha each), so it cannot enforce spatial coherence. '
+              'Raise --min-mmu-ha or lower --multilook.'
+              % (args.min_mmu_ha, pixel_deg * m_per_deg_lat, pixel_area_ha),
+              file=sys.stderr)
     clearing = apply_mmu(clearing, args.min_mmu_ha, pixel_area_ha)
     first_neg_masked = np.where(clearing, first_neg, 0).astype(np.int16)
 
