@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 clearing_summary.json
 validation.json
+out_*/
+out/

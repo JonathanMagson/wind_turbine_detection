@@ -19,6 +19,8 @@ from land_clearing.ccdc import collections as colls
 from land_clearing.ccdc import detect as ccdc_detect
 from land_clearing.ccdc import rules
 from land_clearing.common import aois, masks, validation
+from land_clearing.local_s1 import catalog, omnibus_np, worldcover
+from land_clearing.local_s1 import run as local_run
 from land_clearing.omnibus_s1 import detect as omnibus_detect
 
 
@@ -136,6 +138,82 @@ def test_omnibus_detect_accepts_bbox():
          '--start', '2023-01-01', '--end', '2024-01-01'])
     assert args.aoi is None
     assert args.bbox == [149.6, -29.6, 150.0, -29.3]
+
+
+# --- local (no-Earth-Engine) pipeline ---
+
+def test_relative_orbit_matches_known_scene():
+    # S1A_IW_GRDH_1SDV_20230106T192310_..._046667_... covers the NSW AOI on
+    # track 45; absolute orbit 46667 must map back to it.
+    assert catalog.relative_orbit(46667, 'S1A') == 45
+
+
+def test_scene_time_parses_utc_from_name():
+    p = ('GRD/2023/1/6/IW/DV/S1A_IW_GRDH_1SDV_20230106T192310_'
+         '20230106T192335_046667_0597F6_EBEB/')
+    assert catalog.scene_time(p) == 192310
+
+
+def test_worldcover_tile_naming():
+    # NSW AOI at 148.8E, 30.0S sits in the 3-degree tile with SW corner S30E147.
+    assert worldcover.tile_name(148.80, -29.95) == \
+        'ESA_WorldCover_10m_2021_v200_S30E147_Map.tif'
+    assert worldcover.tile_name(0.5, 0.5) == \
+        'ESA_WorldCover_10m_2021_v200_N00E000_Map.tif'
+
+
+def test_omnibus_np_detects_an_injected_change_at_the_right_interval():
+    import numpy as np
+    rng = np.random.default_rng(0)
+    H = W = 24
+    k = 10
+    enl = omnibus_np.ENL
+    change_at = 5          # images 0..4 stable, 5..9 cleared
+
+    def speckle(vv, vh, shape):
+        return np.stack([rng.gamma(enl, vv / enl, shape) * enl,
+                         rng.gamma(enl, vh / enl, shape) * enl])
+
+    series = []
+    for t in range(k):
+        im = speckle(0.10, 0.030, (H, W))
+        if t >= change_at:
+            im[:, :, W // 2:] = speckle(0.055, 0.008, (H, W // 2))
+        series.append(im)
+
+    res = omnibus_np.change_maps(series, alpha=0.01)
+    neg = res['bmap'] == omnibus_np.NEGATIVE
+
+    cleared, stable = neg[:, :, W // 2:], neg[:, :, :W // 2]
+    # The injected change must dominate its own interval.
+    per_interval = cleared.sum(axis=(1, 2))
+    assert per_interval.argmax() == change_at - 1, per_interval
+    assert cleared.any(0).mean() > 0.3, 'detection rate too low'
+    # False positives must stay near the significance level.
+    assert stable.any(0).mean() < 0.06, 'false positive rate too high'
+
+
+def test_first_negative_interval_takes_the_earliest():
+    import numpy as np
+    bmap = np.zeros((3, 2, 2))
+    bmap[2, 0, 0] = omnibus_np.NEGATIVE
+    bmap[0, 0, 0] = omnibus_np.NEGATIVE      # earlier one must win
+    bmap[1, 1, 1] = omnibus_np.POSITIVE      # wrong direction, ignored
+    out = local_run.first_negative_interval(bmap)
+    assert out[0, 0] == 1
+    assert out[1, 1] == 0
+
+
+def test_apply_mmu_drops_small_components():
+    import numpy as np
+    mask = np.zeros((20, 20), dtype=bool)
+    mask[2, 2] = True                 # 1 px speck
+    mask[10:14, 10:14] = True         # 16 px block
+    pixel_area_ha = 0.01              # 100 m^2 per pixel
+    kept = local_run.apply_mmu(mask, min_mmu_ha=0.05, pixel_area_ha=pixel_area_ha)
+    assert not kept[2, 2]
+    assert kept[11, 11]
+    assert kept.sum() == 16
 
 
 # --- validation maths ---
