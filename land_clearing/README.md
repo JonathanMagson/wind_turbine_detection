@@ -54,6 +54,31 @@ particular event is plausibly airfield vegetation management rather than
 agricultural clearing. The detector found a real clearing event; what the
 clearing was *for* is not something backscatter can tell you.
 
+### Optical verification of every detection
+
+Each of the four detection sites was checked against its own cloud-free
+Sentinel-2 pair, bracketing that site's own break interval:
+
+![All sites](results/all_sites_s1_s2_compare.png)
+
+| Site | Area | Window | rain_flag | Optical verdict |
+| --- | --- | --- | --- | --- |
+| polygon 1 | 24.9 ha | 25 Sep - 7 Oct | ok | **Confirmed.** Discrete NDVI collapse and localised VH drop, both matching the polygon. Vegetated before, bare after. |
+| polygons 3, 4 | 7.4 ha | 3 - 27 Jul | check | Rejected. VH fell across the entire chip, not at the polygon; no discrete NDVI patch. |
+| polygon 2 | 4.1 ha | 15 - 27 Jul | check | Rejected. Same area-wide VH decline; nothing discrete at the polygon. |
+| polygon 5 | 2.7 ha | 3 - 15 Jul | check | Rejected, and contradicted: NDVI *rose* across the chip while VH fell. Vegetation greening with soil drying is the opposite of clearing. |
+
+**So 24.9 ha of the 39.1 ha detected is real clearing, and `rain_flag` predicted
+every rejection.** The flag was derived from the radar alone, before any optical
+data was fetched, so this is an independent confirmation that it works -- filter
+on `rain_flag == 'ok'` and the four false positives disappear without losing the
+true one.
+
+That also sharpens the earlier caution about the July cluster. Those detections
+are not merely uncertain; the optical says they are the early-July wet-to-dry
+transition, and the omnibus test flagged them because a basin-wide drop in
+backscatter is a real change, just not clearing.
+
 | AOI | Woody | Raw negative change | Clearing | Patches |
 | --- | --- | --- | --- | --- |
 | `cobar_town` | 33,089 ha | 255 ha | **35.1 ha** | 4 |

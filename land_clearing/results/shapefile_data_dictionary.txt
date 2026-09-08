@@ -59,12 +59,18 @@ HOW TO READ THESE RESULTS
 -------------------------
 These are DETECTIONS, not a validated clearing inventory.
 
-* One event has been checked in detail: the 24.9 ha polygon near
-  (145.792, -31.543) tracks surrounding woodland to within 0.3 dB for nine
-  months, then falls 3.5 dB between 13 September and 7 October 2023 and stays
-  down. That is a confident detection.
-* Polygons with rain_flag = 'check' coincide with an area-wide darkening and
-  should be treated as unconfirmed until inspected.
+* Every polygon has now been checked against cloud-free Sentinel-2 either side
+  of its own event window. ONE IS CONFIRMED CLEARING: the 24.9 ha polygon near
+  (145.792, -31.543), which tracks surrounding woodland to within 0.3 dB for
+  nine months, falls 3.5 dB between 13 September and 7 October 2023 and stays
+  down, and shows a discrete vegetated-to-bare transition in the optical.
+* THE OTHER FOUR WERE REJECTED on that inspection. All four carry
+  rain_flag = 'check', and in each the radar shows backscatter falling across
+  the whole chip rather than at the polygon, with no discrete optical change.
+  For one of them NDVI actually ROSE while backscatter fell, which is
+  vegetation greening as soil dries -- the opposite of clearing.
+* Filtering on rain_flag = 'ok' therefore removes every false positive here
+  without losing the true one. Do that before using this layer.
 * Recall was measured at 83% against that single event, with labels derived
   from the same imagery rather than an independent source. Areas are therefore
   a FLOOR: events below the 2 ha minimum mapping unit are invisible, and
