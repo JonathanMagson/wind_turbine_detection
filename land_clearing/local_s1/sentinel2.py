@@ -157,6 +157,36 @@ def read_rgb(safe_prefix, bbox, with_nir=True):
     return out
 
 
+def find_least_cloudy(bbox, candidates, limit=24, min_valid=0.6,
+                      verbose=True):
+    """Best available granule when nothing is genuinely clear.
+
+    ``find_cloudfree`` returns nothing when no scene meets a hard cloud bar,
+    which is the right answer for a measurement and the wrong one for a
+    picture: a 20% cloudy chip still shows whether a paddock was cleared. The
+    cloud fraction comes back with it so it can be stated rather than implied.
+    """
+    best = None
+    tried = 0
+    for date, prefix in candidates:
+        if tried >= limit:
+            break
+        res = assess(prefix, bbox)
+        if res is None:
+            continue
+        valid, cloud = res
+        tried += 1
+        if valid < min_valid:
+            continue
+        if best is None or cloud < best[2]:
+            best = (date, prefix, cloud)
+        if cloud <= 0.01:
+            break
+    if best and verbose:
+        print('  fallback %s at %.0f%% cloud' % (best[0], 100 * best[2]))
+    return best if best else (None, None, None)
+
+
 def find_cloudfree(bbox, candidates, max_cloud=0.02, min_valid=0.98, limit=12,
                    verbose=True):
     """First granule from ``candidates`` that is clear over the AOI.
