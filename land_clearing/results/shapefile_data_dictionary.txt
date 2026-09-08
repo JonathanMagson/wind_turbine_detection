@@ -1,0 +1,121 @@
+NSW Sentinel-1 land-clearing detections, 2023
+=============================================
+
+Generated from ESA Sentinel-1 IW GRDH read from the public AWS mirror, using
+the sequential omnibus change detection test of Conradsen et al. (2016).
+Geometry EPSG:4326; areas computed in EPSG:3577 (GDA94 / Australian Albers).
+
+Files
+-----
+nsw_clearing_2023.gpkg            GeoPackage (preferred - full field names)
+nsw_clearing_2023.geojson         GeoJSON (web / quick view)
+nsw_clearing_2023_shapefile.zip   ESRI Shapefile set (.shp .shx .dbf .prj .cpg)
+
+ATTRIBUTES
+----------
+clear_id     Polygon identifier, unique across the dataset.
+aoi          Area of interest the detection came from.
+area_ha      Area in hectares, computed in Australian Albers (equal area).
+n_pixels     Number of 89 m detection pixels.
+interval     Index of the acquisition interval the change was first detected in.
+date_from    Last acquisition BEFORE the change was detected.
+date_to      First acquisition AFTER. The change occurred between these two
+             dates; the interval is normally 12 days (Sentinel-1 repeat).
+vh_pre       Mean VH backscatter (dB) over up to 4 acquisitions before.
+vh_post      Mean VH backscatter (dB) over up to 4 acquisitions after.
+vh_drop      vh_post - vh_pre. Clearing destroys volume scattering, so this is
+             negative; larger magnitude means denser vegetation removed.
+vv_pre/vv_post/vv_drop   The same for VV.
+persist      Fraction of acquisitions after the break that stay at least 1 dB
+             below the pre-break mean. THE MOST USEFUL COLUMN FOR TRIAGE.
+             Clearing is permanent, so real events sit at or near 1.0. A
+             transient dip from rainfall or a wet-to-dry transition recovers
+             and scores low.
+rain_flag    'check' if the AOI-wide woody median ALSO fell more than 1 dB in
+             the same interval, i.e. the whole area darkened at once. That is a
+             real backscatter change but it is not clearing. 'ok' otherwise.
+aoi_dlevel   The underlying number behind rain_flag: change in the AOI-wide
+             woody median backscatter over the same interval, in dB. Set your
+             own threshold if 1 dB does not suit.
+n_changes    Number of significant changes detected over the whole series. A
+             genuine clearing is normally 1-2; higher suggests an unstable
+             pixel rather than a single event.
+compact      Polsby-Popper compactness, 4*pi*A/P^2. 1.0 is a circle. Machine
+             cleared paddocks are blocky and score moderately; ragged shapes
+             are more likely to be speckle survivors.
+lc_class     ESA WorldCover 2021 class code (majority within the polygon).
+lc_name      Human readable class name.
+woody_frac   Fraction of the polygon mapped as woody (tree cover or shrubland)
+             in the WorldCover baseline.
+lon, lat     Polygon centroid, EPSG:4326.
+orbit        Sentinel-1 relative orbit (track). One track per AOI, so incidence
+             angle is constant per pixel.
+n_scenes     Number of acquisitions in the time series.
+multilook    Block-averaging factor applied before testing (8 = 89 m pixels).
+enl          Equivalent number of looks used by the test.
+alpha        Per-test significance level.
+
+FUSED SCREENING ATTRIBUTES (confirm.py)
+---------------------------------------
+vh_core      VH contrast in dB over the more strongly changed HALF of the
+             polygon, against a ring of woody vegetation around it. Resistant
+             to a weak fringe diluting a genuine core.
+vh_frac      Share of the polygon past the contrast threshold. Stops a handful
+             of strong pixels vouching for a large polygon.
+ndvi_contr   The same contrast on median cloud-free Sentinel-2 NDVI composites
+             either side of the event. Independent of the radar, so agreement
+             is corroboration rather than the same error twice. POSITIVE means
+             the polygon became greener than its surroundings -- soil drying,
+             not clearing.
+ndvi_pre     Absolute pre-event NDVI inside the polygon.
+pre_contr    Pre-event NDVI inside the polygon MINUS its surroundings. Asks
+             whether there was vegetation to clear at all. Negative means the
+             polygon was already barer than its neighbours.
+s2_n_pre     Scenes composited before the event.
+s2_n_post    Scenes composited after.
+verdict      confirmed    both sensors agree the change is local
+             radar_only   radar agrees, optical absent or non-committal (over
+                          Cobar in July every S2 scene was fully clouded)
+             optical_only optical agrees, radar does not
+             no_baseline  the polygon was already barer than its surroundings,
+                          so the woody baseline is wrong. The CHANGE is real;
+                          it is not clearing. Distinct from 'rejected'.
+             rejected     the change is no larger than in the surroundings
+
+USE verdict == 'confirmed'. Treat 'radar_only' as a lead requiring a look, and
+'no_baseline' as a land-cover error rather than a detection error.
+
+HOW TO READ THESE RESULTS
+-------------------------
+These are DETECTIONS, not a validated clearing inventory.
+
+* Every polygon has now been checked against cloud-free Sentinel-2 either side
+  of its own event window. ONE IS CONFIRMED CLEARING: the 24.9 ha polygon near
+  (145.792, -31.543), which tracks surrounding woodland to within 0.3 dB for
+  nine months, falls 3.5 dB between 13 September and 7 October 2023 and stays
+  down, and shows a discrete vegetated-to-bare transition in the optical.
+* THE OTHER FOUR WERE REJECTED on that inspection. All four carry
+  rain_flag = 'check', and in each the radar shows backscatter falling across
+  the whole chip rather than at the polygon, with no discrete optical change.
+  For one of them NDVI actually ROSE while backscatter fell, which is
+  vegetation greening as soil dries -- the opposite of clearing.
+* Filtering on rain_flag = 'ok' removes every false positive in the original
+  layer without losing the true one. The fused screening supersedes it: use
+  verdict == 'confirmed'.
+* Of 24 candidates across a strict and a relaxed run, ONE is confirmed
+  clearing (24.9 ha) and SEVEN were rejected as baseline errors -- polygons
+  already barer than their surroundings, in paddocks WorldCover had labelled
+  tree cover. All five candidates in the cobar_e AOI fell into that class, so
+  its woody mask is systematically wrong.
+* Recall was measured at 83% against that single event, with labels derived
+  from the same imagery rather than an independent source. Areas are therefore
+  a FLOOR: events below the 2 ha minimum mapping unit are invisible, and
+  partially cleared paddocks are clipped.
+* No radiometric terrain correction was applied. Results are sound over flat
+  inland NSW and unreliable over steep terrain.
+* Backscatter loss is not unique to clearing. Fire, harvest and drought dieback
+  all reduce it. The woody-cover mask and the flags above suppress most of it,
+  but separating fire from clearing needs a burnt-area layer.
+
+For an independent accuracy assessment, compare against the NSW SLATS woody
+vegetation change layer from https://datasets.seed.nsw.gov.au/
