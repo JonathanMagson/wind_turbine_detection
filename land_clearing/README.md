@@ -30,6 +30,30 @@ detection lands **60 m away** -- under one pixel -- in the correct interval.
 
 ![Cobar time series](results/cobar_town_timeseries.png)
 
+Sentinel-2 confirms it independently. `local_s1/sentinel2.py` pulls cloud-free
+L2A chips from the public Google Cloud mirror (also anonymous), screening cloud
+with the SCL band **over the chip** rather than the granule -- a scene can be
+40% cloudy overall and clear across 3 km. The nearest clear pair, 12 September
+and 7 October 2023, brackets the radar event window almost exactly: vegetated
+before, bare after.
+
+```bash
+python -m land_clearing.local_s1.compare_figure fin_cobar_town \
+    --lon 145.79195 --lat -31.54282 \
+    --polygons shapefiles/nsw_clearing_2023.geojson --out compare.png
+```
+
+![S1 and S2 before and after](results/cobar_town_s1_s2_compare.png)
+
+Two things that figure makes plain. The NDVI panel is washed brown across the
+*whole* chip -- September to October drying in western NSW -- so an optical
+threshold alone would flag the entire scene; the cleared patch is separable only
+because its loss is far deeper than the seasonal background. And the site sits
+immediately beside an airstrip (the location matches Cobar Airport), so this
+particular event is plausibly airfield vegetation management rather than
+agricultural clearing. The detector found a real clearing event; what the
+clearing was *for* is not something backscatter can tell you.
+
 | AOI | Woody | Raw negative change | Clearing | Patches |
 | --- | --- | --- | --- | --- |
 | `cobar_town` | 33,089 ha | 255 ha | **35.1 ha** | 4 |
