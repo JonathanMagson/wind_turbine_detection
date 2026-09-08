@@ -19,6 +19,8 @@ overall and perfectly clear over a 3 km chip.
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 import urllib.parse
 import urllib.request
 
@@ -79,13 +81,24 @@ def list_granules(zone, band, square, start=None, end=None):
     return sorted(out)
 
 
-def _band_url(safe_prefix, resolution, suffix):
+@lru_cache(maxsize=1024)
+def _granule_files(safe_prefix):
+    """Every IMG_DATA file in a .SAFE, listed once and cached.
+
+    Listing per band instead costs six API round trips per scene before a
+    single pixel is read, which dominated the runtime of the fusion stage.
+    """
     granules = _ls(safe_prefix + 'GRANULE/')
     if not granules:
-        return None
-    files = _ls(granules[0] + 'IMG_DATA/%s/' % resolution, delimiter='')
-    hits = [f for f in files if f.endswith(suffix)]
-    return RAW + hits[0] if hits else None
+        return ()
+    return tuple(_ls(granules[0] + 'IMG_DATA/', delimiter=''))
+
+
+def _band_url(safe_prefix, resolution, suffix):
+    for f in _granule_files(safe_prefix):
+        if f.endswith(suffix) and ('/%s/' % resolution) in f:
+            return RAW + f
+    return None
 
 
 def _window(ds, bbox):
@@ -211,35 +224,42 @@ def read_ndvi(safe_prefix, bbox):
     return {'ndvi': ndvi, 'transform': tfm, 'crs': crs}
 
 
-def ndvi_composite(bbox, granules, max_scenes=4, min_valid=0.5):
+def ndvi_composite(bbox, granules, max_scenes=3, min_valid=0.5, workers=6):
     """Median cloud-free NDVI over up to ``max_scenes`` granules.
 
     Compositing rather than taking a single date matters here: a single clear
     scene still carries that day's soil moisture and sun angle, and the whole
     point of the comparison is to isolate a persistent change from those.
+
+    Candidates are read in parallel because most of the cost is network
+    latency, and roughly half of them turn out to be empty or cloudy over any
+    given chip -- so more are fetched than are needed.
     """
-    frames, used, meta = [], [], None
-    for date, prefix in granules:
-        if len(frames) >= max_scenes:
-            break
-        got = read_ndvi(prefix, bbox)
-        if got is None:
-            continue
-        arr = got['ndvi']
-        if np.isfinite(arr).mean() < min_valid:
-            continue
-        if meta is None:
-            meta = got
-            frames.append(arr)
-        else:
-            h = min(meta['ndvi'].shape[0], arr.shape[0])
-            w = min(meta['ndvi'].shape[1], arr.shape[1])
-            frames = [f[:h, :w] for f in frames]
-            frames.append(arr[:h, :w])
-        used.append(date)
-    if not frames:
+    candidates = list(granules)[:max_scenes * 2]
+    if not candidates:
         return None
+
+    def one(item):
+        date, prefix = item
+        try:
+            got = read_ndvi(prefix, bbox)
+        except Exception:                                    # noqa: BLE001
+            return None
+        if got is None or np.isfinite(got['ndvi']).mean() < min_valid:
+            return None
+        got['date'] = date
+        return got
+
+    with ThreadPoolExecutor(workers) as ex:
+        results = [r for r in ex.map(one, candidates) if r]
+    if not results:
+        return None
+    results = results[:max_scenes]
+
+    h = min(r['ndvi'].shape[0] for r in results)
+    w = min(r['ndvi'].shape[1] for r in results)
+    stack = np.stack([r['ndvi'][:h, :w] for r in results])
     with np.errstate(invalid='ignore'):
-        comp = np.nanmedian(np.stack(frames), axis=0)
-    return {'ndvi': comp, 'transform': meta['transform'], 'crs': meta['crs'],
-            'dates': used}
+        comp = np.nanmedian(stack, axis=0)
+    return {'ndvi': comp, 'transform': results[0]['transform'],
+            'crs': results[0]['crs'], 'dates': [r['date'] for r in results]}

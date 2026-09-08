@@ -74,19 +74,18 @@ def radar_contrast(stack, dates, poly, ring, before, after, band=1, window=4):
     return d_poly, d_ring, d_poly - d_ring
 
 
-def optical_contrast(geom, bbox, before_granules, after_granules,
-                     max_scenes=4):
-    """NDVI change inside the polygon vs its surroundings, from S2 composites."""
-    from shapely.ops import transform as shp_transform
+def contrast_from_composites(geom, pre, post):
+    """NDVI change inside a polygon vs its surroundings, from two composites.
+
+    Split out from ``optical_contrast`` so one composite pair can serve every
+    candidate near it -- building the composites is the expensive step, and
+    measuring a polygon against them is nearly free.
+    """
     from pyproj import Transformer
+    from shapely.ops import transform as shp_transform
 
-    from . import sentinel2 as s2
-
-    pre = s2.ndvi_composite(bbox, before_granules, max_scenes=max_scenes)
-    post = s2.ndvi_composite(bbox, after_granules, max_scenes=max_scenes)
     if pre is None or post is None:
         return None
-
     h = min(pre['ndvi'].shape[0], post['ndvi'].shape[0])
     w = min(pre['ndvi'].shape[1], post['ndvi'].shape[1])
     d = post['ndvi'][:h, :w] - pre['ndvi'][:h, :w]
@@ -108,6 +107,16 @@ def optical_contrast(geom, bbox, before_granules, after_granules,
             'ndvi_contrast': d_poly - d_ring,
             'n_pre': len(pre['dates']), 'n_post': len(post['dates']),
             'pre_dates': pre['dates'], 'post_dates': post['dates']}
+
+
+def optical_contrast(geom, bbox, before_granules, after_granules,
+                     max_scenes=3):
+    """Build composites for one polygon and measure its NDVI contrast."""
+    from . import sentinel2 as s2
+    return contrast_from_composites(
+        geom,
+        s2.ndvi_composite(bbox, before_granules, max_scenes=max_scenes),
+        s2.ndvi_composite(bbox, after_granules, max_scenes=max_scenes))
 
 
 def verdict(vh_contrast, ndvi_contrast,

@@ -25,6 +25,11 @@ import numpy as np
 
 from . import fusion, vectorise
 
+# Optical composites are shared between candidates falling in the same cell
+# with the same event window.
+CELL_DEG = 0.02
+CHIP_HALF = 0.03
+
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__,
@@ -50,6 +55,7 @@ def main(argv=None):
 
     frames = []
     granule_cache = {}
+    composite_cache = {}
     for rd in a.rundirs:
         gdf, summary = vectorise.build(rd)
         if gdf.empty:
@@ -79,8 +85,6 @@ def main(argv=None):
 
             if not a.skip_optical:
                 lon, lat = float(r['lon']), float(r['lat'])
-                half = 0.014
-                chip = (lon - half, lat - half, lon + half, lat + half)
                 zone, band, sq = s2.mgrs_tile(lon, lat)
                 key = (zone, band, sq)
                 if key not in granule_cache:
@@ -89,10 +93,27 @@ def main(argv=None):
                 gran = granule_cache[key]
                 bcut = str(r['date_from'])[:10].replace('-', '')
                 acut = str(r['date_to'])[:10].replace('-', '')
-                before = list(reversed([g for g in gran if g[0] <= bcut]))
-                after = [g for g in gran if g[0] >= acut]
-                oc = fusion.optical_contrast(r.geometry, chip, before, after,
-                                             max_scenes=a.max_scenes)
+
+                # Candidates cluster, and an optical composite is by far the
+                # most expensive thing here, so share one across neighbours
+                # on the same event window. The chip is centred on a CELL of
+                # CELL_DEG rather than on the polygon, and is half again as
+                # wide, so any polygon in the cell is comfortably inside it.
+                cell = (round(lon / CELL_DEG), round(lat / CELL_DEG),
+                        bcut, acut)
+                if cell not in composite_cache:
+                    clon = round(lon / CELL_DEG) * CELL_DEG
+                    clat = round(lat / CELL_DEG) * CELL_DEG
+                    chip = (clon - CHIP_HALF, clat - CHIP_HALF,
+                            clon + CHIP_HALF, clat + CHIP_HALF)
+                    before = list(reversed([g for g in gran if g[0] <= bcut]))
+                    after = [g for g in gran if g[0] >= acut]
+                    composite_cache[cell] = (
+                        chip,
+                        s2.ndvi_composite(chip, before, max_scenes=a.max_scenes),
+                        s2.ndvi_composite(chip, after, max_scenes=a.max_scenes))
+                chip, pre_c, post_c = composite_cache[cell]
+                oc = fusion.contrast_from_composites(r.geometry, pre_c, post_c)
                 if oc:
                     out.update({'ndvi_poly': _r(oc['ndvi_poly'], 4),
                                 'ndvi_bkg': _r(oc['ndvi_bkg'], 4),
