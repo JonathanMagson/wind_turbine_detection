@@ -39,6 +39,8 @@ S2_SCALE = 8            # S2 is 10 m against the 89 m radar grid
 # decision is not fitted to a single event.
 VH_CONTRAST_DB = -1.5
 NDVI_CONTRAST = -0.03
+# Minimum share of a polygon that must clear the radar contrast threshold.
+MIN_STRONG_FRACTION = 0.35
 
 
 def rasterize_polygon(geom, transform, shape):
@@ -63,15 +65,52 @@ def _mean(stack_db, idx, mask):
     return float(np.nanmean(stack_db[idx][:, mask]))
 
 
-def radar_contrast(stack, dates, poly, ring, before, after, band=1, window=4):
-    """VH (or VV) change inside the polygon, in its background, and the difference."""
+def radar_contrast(stack, dates, poly, ring, before, after, band=1, window=4,
+                   threshold=None):
+    """Per-pixel VH contrast against the local background, summarised 3 ways.
+
+    A single polygon mean is dilution-prone: a permissive detection threshold
+    glues a strong core to a weak fringe, and the mean over the union falls
+    below any fixed cut even though the core is unambiguous. Observed directly
+    here -- the 24.9 ha Cobar event scores -2.91 dB, but the 33.7 ha polygon
+    that absorbs its surroundings scores only -1.17.
+
+    So three numbers are returned instead of one:
+      ``mean``  the polygon mean, kept for continuity
+      ``core``  the mean over the more strongly changed half of the polygon
+      ``frac``  the fraction of the polygon past ``threshold``
+
+    ``core`` survives a weak fringe; ``frac`` says how much of the polygon is
+    actually carrying the signal, so a few strong pixels cannot vouch for a
+    large one.
+    """
+    if threshold is None:
+        threshold = VH_CONTRAST_DB
     with np.errstate(divide='ignore', invalid='ignore'):
         db = 10.0 * np.log10(np.where(stack[:, band] > 0, stack[:, band], np.nan))
     ip = [i for i, d in enumerate(dates) if d <= before][-window:]
     iq = [i for i, d in enumerate(dates) if d >= after][:window]
-    d_poly = _mean(db, iq, poly) - _mean(db, ip, poly)
-    d_ring = _mean(db, iq, ring) - _mean(db, ip, ring)
-    return d_poly, d_ring, d_poly - d_ring
+    blank = {'mean': np.nan, 'core': np.nan, 'frac': np.nan,
+             'poly': np.nan, 'bkg': np.nan}
+    if not ip or not iq or not poly.any() or not ring.any():
+        return blank
+
+    with np.errstate(invalid='ignore'):
+        pre = np.nanmean(db[ip], axis=0)
+        post = np.nanmean(db[iq], axis=0)
+    delta = post - pre                       # per-pixel change
+    d_ring = float(np.nanmean(delta[ring]))  # local background change
+    contrast = delta - d_ring                # per-pixel local contrast
+
+    vals = contrast[poly]
+    vals = vals[np.isfinite(vals)]
+    if not vals.size:
+        blank['bkg'] = d_ring
+        return blank
+    core = float(np.mean(np.sort(vals)[:max(1, vals.size // 2)]))
+    return {'mean': float(vals.mean()), 'core': core,
+            'frac': float((vals <= threshold).mean()),
+            'poly': float(np.nanmean(delta[poly])), 'bkg': d_ring}
 
 
 def contrast_from_composites(geom, pre, post):
@@ -119,16 +158,27 @@ def optical_contrast(geom, bbox, before_granules, after_granules,
         s2.ndvi_composite(bbox, after_granules, max_scenes=max_scenes))
 
 
-def verdict(vh_contrast, ndvi_contrast,
-            vh_thresh=VH_CONTRAST_DB, ndvi_thresh=NDVI_CONTRAST):
-    """Combine the two contrasts into a label.
+def verdict(vh, ndvi_contrast, vh_thresh=VH_CONTRAST_DB,
+            ndvi_thresh=NDVI_CONTRAST, min_frac=MIN_STRONG_FRACTION):
+    """Combine radar and optical contrast into a label.
 
-    ``confirmed``  both sensors agree the change is local
-    ``radar_only`` radar says local, optical does not corroborate (or is absent)
-    ``optical_only`` optical says local, radar does not
-    ``rejected``   neither: the change is as large in the surroundings
+    Radar passes when the strongly-changed half of the polygon clears the
+    threshold AND at least ``min_frac`` of the polygon does, so a genuine core
+    is not voted down by a weak fringe and a handful of pixels cannot carry a
+    large polygon.
+
+    ``radar_only`` is a real outcome here rather than a fudge: in the July
+    windows over Cobar every Sentinel-2 scene was fully clouded over the chip,
+    so there is no optical evidence to agree or disagree with. It is reported
+    as its own class instead of being folded silently into either confirmation
+    or rejection.
     """
-    r = vh_contrast is not None and np.isfinite(vh_contrast) and vh_contrast <= vh_thresh
+    if vh is None:
+        r = False
+    else:
+        core, frac = vh.get('core'), vh.get('frac')
+        r = (core is not None and np.isfinite(core) and core <= vh_thresh
+             and frac is not None and np.isfinite(frac) and frac >= min_frac)
     o = (ndvi_contrast is not None and np.isfinite(ndvi_contrast)
          and ndvi_contrast <= ndvi_thresh)
     if r and o:

@@ -224,7 +224,7 @@ def read_ndvi(safe_prefix, bbox):
     return {'ndvi': ndvi, 'transform': tfm, 'crs': crs}
 
 
-def ndvi_composite(bbox, granules, max_scenes=3, min_valid=0.5, workers=6):
+def ndvi_composite(bbox, granules, max_scenes=3, min_valid=0.35, workers=8):
     """Median cloud-free NDVI over up to ``max_scenes`` granules.
 
     Compositing rather than taking a single date matters here: a single clear
@@ -235,7 +235,9 @@ def ndvi_composite(bbox, granules, max_scenes=3, min_valid=0.5, workers=6):
     latency, and roughly half of them turn out to be empty or cloudy over any
     given chip -- so more are fetched than are needed.
     """
-    candidates = list(granules)[:max_scenes * 2]
+    # Cloudy windows need a deep candidate list: over Cobar in early July
+    # several consecutive dates came back 0%% valid.
+    candidates = list(granules)[:max_scenes * 6]
     if not candidates:
         return None
 

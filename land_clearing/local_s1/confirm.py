@@ -41,6 +41,9 @@ def main(argv=None):
                    help='S2 scenes composited per side (default 4)')
     p.add_argument('--vh-contrast', type=float, default=fusion.VH_CONTRAST_DB)
     p.add_argument('--ndvi-contrast', type=float, default=fusion.NDVI_CONTRAST)
+    p.add_argument('--min-frac', type=float, default=fusion.MIN_STRONG_FRACTION,
+                   help='minimum share of a polygon that must clear the radar '
+                        'contrast threshold (default 0.35)')
     p.add_argument('--skip-optical', action='store_true')
     a = p.parse_args(argv)
 
@@ -77,11 +80,12 @@ def main(argv=None):
         for _, r in gdf.iterrows():
             poly = fusion.rasterize_polygon(r.geometry, transform, shape)
             ring = fusion.background_ring(poly, valid=woody)
-            d_poly, d_ring, contrast = fusion.radar_contrast(
+            vh = fusion.radar_contrast(
                 stack, dates, poly, ring, str(r['date_from'])[:10],
-                str(r['date_to'])[:10])
-            out = {'vh_poly': _r(d_poly), 'vh_bkg': _r(d_ring),
-                   'vh_contr': _r(contrast)}
+                str(r['date_to'])[:10], threshold=a.vh_contrast)
+            out = {'vh_poly': _r(vh['poly']), 'vh_bkg': _r(vh['bkg']),
+                   'vh_contr': _r(vh['mean']), 'vh_core': _r(vh['core']),
+                   'vh_frac': _r(vh['frac'], 3)}
 
             if not a.skip_optical:
                 lon, lat = float(r['lon']), float(r['lat'])
@@ -125,11 +129,13 @@ def main(argv=None):
                                 'ndvi_contr': None, 's2_n_pre': 0,
                                 's2_n_post': 0})
             out['verdict'] = fusion.verdict(
-                out.get('vh_contr'), out.get('ndvi_contr'),
-                a.vh_contrast, a.ndvi_contrast)
-            print('   id %-3s %6.1f ha  vh_contr %6s  ndvi_contr %8s  -> %s'
+                vh, out.get('ndvi_contr'), a.vh_contrast, a.ndvi_contrast,
+                a.min_frac)
+            print('   id %-3s %6.1f ha  mean %6s core %6s frac %5s  '
+                  'ndvi %8s  -> %s'
                   % (r['clear_id'], r['area_ha'], out['vh_contr'],
-                     out.get('ndvi_contr'), out['verdict']), file=sys.stderr)
+                     out['vh_core'], out['vh_frac'], out.get('ndvi_contr'),
+                     out['verdict']), file=sys.stderr)
             rows.append(out)
 
         for k in rows[0]:

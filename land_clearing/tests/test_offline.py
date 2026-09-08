@@ -162,6 +162,108 @@ def test_worldcover_tile_naming():
         'ESA_WorldCover_10m_2021_v200_N00E000_Map.tif'
 
 
+def _synthetic_change(poly, core_db, fringe_db, core_frac, n_dates=8):
+    """A dual-pol series where part of ``poly`` drops by ``core_db``."""
+    import numpy as np
+    stack = np.ones((n_dates, 2) + poly.shape) * 0.02
+    ys, xs = np.where(poly)
+    n = int(len(ys) * core_frac)
+    half = n_dates // 2
+    stack[half:, 1, ys[:n], xs[:n]] *= 10 ** (core_db / 10)
+    stack[half:, 1, ys[n:], xs[n:]] *= 10 ** (fringe_db / 10)
+    return stack
+
+
+def test_radar_contrast_survives_a_diluting_fringe():
+    # A permissive detection threshold glues a strong core to a weak fringe.
+    # The polygon MEAN then falls below any fixed cut even though the core is
+    # unambiguous -- observed for real: the 24.9 ha Cobar event scores
+    # -2.91 dB, the 33.7 ha polygon absorbing its surroundings only -1.17.
+    import numpy as np
+    from land_clearing.local_s1 import fusion
+
+    poly = np.zeros((40, 40), dtype=bool); poly[10:30, 10:30] = True
+    ring = np.zeros((40, 40), dtype=bool); ring[2:38, 2:38] = True
+    ring &= ~poly
+    dates = ['2023-%02d-01' % i for i in range(1, 9)]
+
+    # 40% of the polygon drops 3 dB, the rest is unchanged: the mean lands at
+    # about -1.2 dB and fails, while the core is near -2.4 dB and passes.
+    vh = fusion.radar_contrast(
+        _synthetic_change(poly, -3.0, 0.0, 0.40), dates, poly, ring,
+        '2023-04-01', '2023-05-01')
+    assert vh['mean'] > fusion.VH_CONTRAST_DB, 'mean should be diluted'
+    assert vh['core'] <= fusion.VH_CONTRAST_DB, 'core should survive'
+    assert vh['frac'] >= fusion.MIN_STRONG_FRACTION
+    assert fusion.verdict(vh, None) == 'radar_only'
+
+
+def test_radar_contrast_matches_the_observed_dilution_case():
+    # Reproduces the real regression: relaxing alpha grew the 24.9 ha Cobar
+    # event to 33.7 ha by absorbing weak neighbours, taking the mean from
+    # -2.91 to -1.17 dB. With only about a third of the polygon carrying the
+    # signal, frac correctly declines to vouch for it.
+    import numpy as np
+    from land_clearing.local_s1 import fusion
+
+    poly = np.zeros((40, 40), dtype=bool); poly[10:30, 10:30] = True
+    ring = np.zeros((40, 40), dtype=bool); ring[2:38, 2:38] = True
+    ring &= ~poly
+    dates = ['2023-%02d-01' % i for i in range(1, 9)]
+    vh = fusion.radar_contrast(
+        _synthetic_change(poly, -3.0, -0.2, 0.34), dates, poly, ring,
+        '2023-04-01', '2023-05-01')
+    assert vh['mean'] > fusion.VH_CONTRAST_DB
+    assert vh['core'] <= fusion.VH_CONTRAST_DB
+    assert vh['frac'] < fusion.MIN_STRONG_FRACTION
+    assert fusion.verdict(vh, None) == 'rejected'
+
+
+def test_radar_contrast_rejects_a_uniform_area_wide_drop():
+    # The Cobar false positives: everything fell together, so contrast against
+    # the local background is near zero.
+    import numpy as np
+    from land_clearing.local_s1 import fusion
+
+    poly = np.zeros((40, 40), dtype=bool); poly[10:30, 10:30] = True
+    ring = np.zeros((40, 40), dtype=bool); ring[2:38, 2:38] = True
+    ring &= ~poly
+    dates = ['2023-%02d-01' % i for i in range(1, 9)]
+    vh = fusion.radar_contrast(
+        _synthetic_change(poly, -1.0, -1.0, 1.0), dates, poly, ring,
+        '2023-04-01', '2023-05-01')
+    assert vh['frac'] == 0.0
+    assert fusion.verdict(vh, None) == 'rejected'
+
+
+def test_radar_contrast_rejects_a_tiny_core_in_a_large_polygon():
+    # frac exists so a handful of strong pixels cannot vouch for a big polygon.
+    import numpy as np
+    from land_clearing.local_s1 import fusion
+
+    poly = np.zeros((40, 40), dtype=bool); poly[10:30, 10:30] = True
+    ring = np.zeros((40, 40), dtype=bool); ring[2:38, 2:38] = True
+    ring &= ~poly
+    dates = ['2023-%02d-01' % i for i in range(1, 9)]
+    vh = fusion.radar_contrast(
+        _synthetic_change(poly, -4.0, -0.1, 0.10), dates, poly, ring,
+        '2023-04-01', '2023-05-01')
+    assert vh['frac'] < fusion.MIN_STRONG_FRACTION
+    assert fusion.verdict(vh, None) == 'rejected'
+
+
+def test_verdict_reports_missing_optical_as_its_own_class():
+    # In the July windows over Cobar every S2 scene was fully clouded, so
+    # there is no optical evidence either way. That must not be read as
+    # confirmation or as rejection.
+    from land_clearing.local_s1 import fusion
+    strong = {'core': -3.0, 'frac': 0.9}
+    assert fusion.verdict(strong, None) == 'radar_only'
+    assert fusion.verdict(strong, -0.10) == 'confirmed'
+    assert fusion.verdict({'core': -0.2, 'frac': 0.0}, -0.10) == 'optical_only'
+    assert fusion.verdict({'core': -0.2, 'frac': 0.0}, None) == 'rejected'
+
+
 def test_vectorise_preserves_area_of_diagonally_touching_pixels():
     # label() uses 8-connectivity, so rasterio's shapes() must too. With the
     # default connectivity=4, a component whose parts touch only at a corner is
