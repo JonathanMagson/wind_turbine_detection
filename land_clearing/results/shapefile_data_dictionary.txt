@@ -55,6 +55,36 @@ multilook    Block-averaging factor applied before testing (8 = 89 m pixels).
 enl          Equivalent number of looks used by the test.
 alpha        Per-test significance level.
 
+FUSED SCREENING ATTRIBUTES (confirm.py)
+---------------------------------------
+vh_core      VH contrast in dB over the more strongly changed HALF of the
+             polygon, against a ring of woody vegetation around it. Resistant
+             to a weak fringe diluting a genuine core.
+vh_frac      Share of the polygon past the contrast threshold. Stops a handful
+             of strong pixels vouching for a large polygon.
+ndvi_contr   The same contrast on median cloud-free Sentinel-2 NDVI composites
+             either side of the event. Independent of the radar, so agreement
+             is corroboration rather than the same error twice. POSITIVE means
+             the polygon became greener than its surroundings -- soil drying,
+             not clearing.
+ndvi_pre     Absolute pre-event NDVI inside the polygon.
+pre_contr    Pre-event NDVI inside the polygon MINUS its surroundings. Asks
+             whether there was vegetation to clear at all. Negative means the
+             polygon was already barer than its neighbours.
+s2_n_pre     Scenes composited before the event.
+s2_n_post    Scenes composited after.
+verdict      confirmed    both sensors agree the change is local
+             radar_only   radar agrees, optical absent or non-committal (over
+                          Cobar in July every S2 scene was fully clouded)
+             optical_only optical agrees, radar does not
+             no_baseline  the polygon was already barer than its surroundings,
+                          so the woody baseline is wrong. The CHANGE is real;
+                          it is not clearing. Distinct from 'rejected'.
+             rejected     the change is no larger than in the surroundings
+
+USE verdict == 'confirmed'. Treat 'radar_only' as a lead requiring a look, and
+'no_baseline' as a land-cover error rather than a detection error.
+
 HOW TO READ THESE RESULTS
 -------------------------
 These are DETECTIONS, not a validated clearing inventory.
@@ -69,8 +99,14 @@ These are DETECTIONS, not a validated clearing inventory.
   the whole chip rather than at the polygon, with no discrete optical change.
   For one of them NDVI actually ROSE while backscatter fell, which is
   vegetation greening as soil dries -- the opposite of clearing.
-* Filtering on rain_flag = 'ok' therefore removes every false positive here
-  without losing the true one. Do that before using this layer.
+* Filtering on rain_flag = 'ok' removes every false positive in the original
+  layer without losing the true one. The fused screening supersedes it: use
+  verdict == 'confirmed'.
+* Of 24 candidates across a strict and a relaxed run, ONE is confirmed
+  clearing (24.9 ha) and SEVEN were rejected as baseline errors -- polygons
+  already barer than their surroundings, in paddocks WorldCover had labelled
+  tree cover. All five candidates in the cobar_e AOI fell into that class, so
+  its woody mask is systematically wrong.
 * Recall was measured at 83% against that single event, with labels derived
   from the same imagery rather than an independent source. Areas are therefore
   a FLOOR: events below the 2 ha minimum mapping unit are invisible, and

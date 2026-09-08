@@ -122,20 +122,23 @@ def main(argv=None):
                     out.update({'ndvi_poly': _r(oc['ndvi_poly'], 4),
                                 'ndvi_bkg': _r(oc['ndvi_bkg'], 4),
                                 'ndvi_contr': _r(oc['ndvi_contrast'], 4),
+                                'ndvi_pre': _r(oc['ndvi_pre'], 4),
+                                'pre_contr': _r(oc['pre_contrast'], 4),
                                 's2_n_pre': oc['n_pre'],
                                 's2_n_post': oc['n_post']})
                 else:
                     out.update({'ndvi_poly': None, 'ndvi_bkg': None,
-                                'ndvi_contr': None, 's2_n_pre': 0,
+                                'ndvi_contr': None, 'ndvi_pre': None,
+                                'pre_contr': None, 's2_n_pre': 0,
                                 's2_n_post': 0})
             out['verdict'] = fusion.verdict(
                 vh, out.get('ndvi_contr'), a.vh_contrast, a.ndvi_contrast,
-                a.min_frac)
-            print('   id %-3s %6.1f ha  mean %6s core %6s frac %5s  '
-                  'ndvi %8s  -> %s'
-                  % (r['clear_id'], r['area_ha'], out['vh_contr'],
-                     out['vh_core'], out['vh_frac'], out.get('ndvi_contr'),
-                     out['verdict']), file=sys.stderr)
+                a.min_frac, pre_contrast=out.get('pre_contr'))
+            print('   id %-3s %6.1f ha  core %6s frac %5s  ndvi %8s  '
+                  'pre %8s  -> %s'
+                  % (r['clear_id'], r['area_ha'], out['vh_core'],
+                     out['vh_frac'], out.get('ndvi_contr'),
+                     out.get('pre_contr'), out['verdict']), file=sys.stderr)
             rows.append(out)
 
         for k in rows[0]:

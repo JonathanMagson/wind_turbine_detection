@@ -252,6 +252,20 @@ def test_radar_contrast_rejects_a_tiny_core_in_a_large_polygon():
     assert fusion.verdict(vh, None) == 'rejected'
 
 
+def test_verdict_gates_on_pre_event_vegetation():
+    # Measured on the two "confirmed" detections. The real Cobar clearing was
+    # greener than its surroundings beforehand (+0.031); the Pilliga polygon
+    # was already barer (-0.062) because WorldCover had mislabelled an
+    # arable paddock as tree cover. Absolute NDVI cannot tell them apart
+    # (0.201 vs 0.189) -- the contrast can.
+    from land_clearing.local_s1 import fusion
+    strong = {'core': -3.0, 'frac': 0.9}
+    assert fusion.verdict(strong, -0.09, pre_contrast=0.031) == 'confirmed'
+    assert fusion.verdict(strong, -0.06, pre_contrast=-0.062) == 'no_baseline'
+    # The gate must not fire when there is no optical evidence to gate on.
+    assert fusion.verdict(strong, None, pre_contrast=None) == 'radar_only'
+
+
 def test_verdict_reports_missing_optical_as_its_own_class():
     # In the July windows over Cobar every S2 scene was fully clouded, so
     # there is no optical evidence either way. That must not be read as

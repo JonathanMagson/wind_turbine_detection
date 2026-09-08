@@ -54,6 +54,71 @@ particular event is plausibly airfield vegetation management rather than
 agricultural clearing. The detector found a real clearing event; what the
 clearing was *for* is not something backscatter can tell you.
 
+### Fused radar + optical screening
+
+Every candidate is put through [`local_s1/confirm.py`](local_s1/confirm.py),
+which asks three questions the omnibus test cannot:
+
+| Attribute | Question |
+| --- | --- |
+| `vh_core`, `vh_frac` | did the polygon drop more than its own surroundings, and over how much of itself? |
+| `ndvi_contr` | does Sentinel-2 agree, independently? |
+| `pre_contr` | **was there vegetation there to begin with?** |
+
+At alpha=0.01, five candidates resolve to one confirmed clearing:
+
+| id | ha | `vh_core` | `vh_frac` | `ndvi_contr` | `pre_contr` | verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| 4 | 24.9 | -3.52 | 0.95 | **-0.087** | +0.033 | **confirmed** |
+| 3 | 4.0 | -1.31 | 0.00 | +0.037 | +0.003 | rejected |
+| 2 | 3.4 | -0.56 | 0.00 | +0.033 | -0.013 | rejected |
+| 1 | 2.7 | -0.52 | 0.00 | +0.022 | -0.019 | rejected |
+| e-1 | 4.1 | -2.21 | 0.67 | -0.002 | **-0.091** | no_baseline |
+
+The three rejections are corroborated twice over: they fail the radar contrast
+*and* their NDVI contrast is **positive** -- they became greener than their
+surroundings while backscatter fell, which is soil drying, not clearing.
+
+**Confirmed clearing: 24.9 ha, one polygon.** Attributes and all verdicts are in
+[`results/detections_fused.geojson`](results/detections_fused.geojson).
+
+### `pre_contr`: the check every other filter structurally misses
+
+Every other test here measures *change* -- woody mask, direction, persistence,
+radar contrast, optical corroboration. None can tell that the **baseline** was
+wrong, because they all inherit WorldCover's judgement and then only ask what
+happened next.
+
+A relaxed run surfaced a 2.7 ha Pilliga candidate that passed everything:
+`vh_frac 1.00`, `ndvi_contr -0.063`. The imagery says otherwise -- the paddock
+was already bare before the event, and WorldCover had labelled it `tree cover`:
+
+![Pilliga baseline error](results/pilliga_no_baseline.png)
+
+Absolute NDVI cannot catch this. In semi-arid NSW the real clearing measured
+0.201 against this paddock's 0.189 -- indistinguishable. The value *relative to
+the surroundings* separates them cleanly: **+0.031 against -0.062**. A clearing
+target must have been at least as vegetated as its neighbours; if it was
+already barer, there was nothing to clear.
+
+`no_baseline` is kept distinct from `rejected` on purpose: the change was real,
+the baseline was not. Across both runs the gate caught **7 of 24 candidates**,
+including all five in `cobar_e` -- that AOI's woody mask is systematically
+wrong, which is a land-cover problem, not a detection one.
+
+### Relaxing alpha does not help
+
+| | candidates | confirmed | no_baseline | rejected |
+| --- | --- | --- | --- | --- |
+| alpha=0.01 | 5 | **1 (24.9 ha)** | 1 | 3 |
+| alpha=0.05 | 19 | **0** | 6 | 11 + 2 radar_only |
+
+Loose detection with tight filtering sounded right and is wrong here. It is
+right about *finding* candidates and wrong about their *delineation*: the
+minimum mapping unit and 8-connectivity glue true cores to weak halos, so the
+24.9 ha event became a 33.7 ha polygon with only 34% of itself carrying the
+signal, and was rejected. **Keep alpha=0.01.**
+
 ### Optical verification of every detection
 
 Each of the four detection sites was checked against its own cloud-free

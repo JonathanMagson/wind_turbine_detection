@@ -41,6 +41,10 @@ VH_CONTRAST_DB = -1.5
 NDVI_CONTRAST = -0.03
 # Minimum share of a polygon that must clear the radar contrast threshold.
 MIN_STRONG_FRACTION = 0.35
+# A clearing target must have been at least as vegetated as its surroundings
+# beforehand. Below this it was already barer than its neighbours, so there was
+# nothing there to clear and any change is something else.
+MIN_PRE_CONTRAST = -0.02
 
 
 def rasterize_polygon(geom, transform, shape):
@@ -142,8 +146,19 @@ def contrast_from_composites(geom, pre, post):
     with np.errstate(invalid='ignore'):
         d_poly = float(np.nanmean(d[poly]))
         d_ring = float(np.nanmean(d[ring]))
+        # Pre-event state, not change. Every other test here measures change,
+        # and none of them can tell that the baseline was wrong: a paddock
+        # already bare before the event produces a real change that is not
+        # clearing. Absolute NDVI does not separate the two -- in semi-arid
+        # NSW a genuine woody target measured 0.201 against a mislabelled
+        # paddock's 0.189 -- but the value relative to the surroundings does:
+        # +0.031 against -0.062.
+        pre_poly = float(np.nanmean(pre['ndvi'][:h, :w][poly]))
+        pre_ring = float(np.nanmean(pre['ndvi'][:h, :w][ring]))
     return {'ndvi_poly': d_poly, 'ndvi_bkg': d_ring,
             'ndvi_contrast': d_poly - d_ring,
+            'ndvi_pre': pre_poly, 'ndvi_pre_bkg': pre_ring,
+            'pre_contrast': pre_poly - pre_ring,
             'n_pre': len(pre['dates']), 'n_post': len(post['dates']),
             'pre_dates': pre['dates'], 'post_dates': post['dates']}
 
@@ -159,20 +174,29 @@ def optical_contrast(geom, bbox, before_granules, after_granules,
 
 
 def verdict(vh, ndvi_contrast, vh_thresh=VH_CONTRAST_DB,
-            ndvi_thresh=NDVI_CONTRAST, min_frac=MIN_STRONG_FRACTION):
-    """Combine radar and optical contrast into a label.
+            ndvi_thresh=NDVI_CONTRAST, min_frac=MIN_STRONG_FRACTION,
+            pre_contrast=None, min_pre_contrast=MIN_PRE_CONTRAST):
+    """Combine radar and optical evidence into a label.
+
+    ``pre_contrast`` is a gate, applied before anything else: if the polygon
+    was already barer than its surroundings, there was no vegetation to
+    remove and the change is something other than clearing. This catches a
+    failure the change tests structurally cannot -- a wrong woody baseline.
+    Sentinel-2 and WorldCover disagreeing about whether a paddock is woody is
+    common, and every other filter here trusts WorldCover.
 
     Radar passes when the strongly-changed half of the polygon clears the
-    threshold AND at least ``min_frac`` of the polygon does, so a genuine core
-    is not voted down by a weak fringe and a handful of pixels cannot carry a
-    large polygon.
+    threshold AND at least ``min_frac`` of it does, so a genuine core is not
+    voted down by a weak fringe and a few pixels cannot carry a large polygon.
 
-    ``radar_only`` is a real outcome here rather than a fudge: in the July
-    windows over Cobar every Sentinel-2 scene was fully clouded over the chip,
-    so there is no optical evidence to agree or disagree with. It is reported
-    as its own class instead of being folded silently into either confirmation
-    or rejection.
+    ``radar_only`` is a real outcome rather than a fudge: in the July windows
+    over Cobar every Sentinel-2 scene was fully clouded over the chip, so
+    there is no optical evidence either way.
     """
+    if (pre_contrast is not None and np.isfinite(pre_contrast)
+            and pre_contrast < min_pre_contrast):
+        return 'no_baseline'
+
     if vh is None:
         r = False
     else:
