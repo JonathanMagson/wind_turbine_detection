@@ -24,6 +24,8 @@ import urllib.request
 
 import numpy as np
 
+from . import http_util
+
 BUCKET = 'gcp-public-data-sentinel-2'
 API = 'https://storage.googleapis.com/storage/v1/b/%s/o' % BUCKET
 RAW = '/vsicurl/https://storage.googleapis.com/%s/' % BUCKET
@@ -40,7 +42,7 @@ def _ls(prefix, delimiter='/'):
                % (API, urllib.parse.quote(prefix), delimiter))
         if token:
             url += '&pageToken=' + token
-        data = json.load(urllib.request.urlopen(url, timeout=90))
+        data = json.loads(http_util.fetch_text(url, timeout=90))
         out += data.get('prefixes', []) + [i['name'] for i in data.get('items', [])]
         token = data.get('nextPageToken')
         if not token:
@@ -165,3 +167,79 @@ def find_cloudfree(bbox, candidates, max_cloud=0.02, min_valid=0.98, limit=12,
         if valid >= min_valid and cloud <= max_cloud:
             return date, prefix
     return None, None
+
+
+def read_ndvi(safe_prefix, bbox):
+    """Cloud-masked NDVI over the AOI, with the window's transform and CRS.
+
+    Returns ``None`` if the granule has no pixels here. Cloudy and shadowed
+    pixels come back as NaN so a stack of dates can be median-composited
+    without them.
+    """
+    import rasterio
+    from rasterio.windows import transform as window_transform
+
+    red_url = _band_url(safe_prefix, 'R10m', 'B04_10m.jp2')
+    nir_url = _band_url(safe_prefix, 'R10m', 'B08_10m.jp2')
+    scl_url = _band_url(safe_prefix, 'R20m', 'SCL_20m.jp2')
+    if not (red_url and nir_url and scl_url):
+        return None
+
+    with rasterio.open(red_url) as ds:
+        win = _window(ds, bbox)
+        red = ds.read(1, window=win).astype(np.float32)
+        tfm = window_transform(win, ds.transform)
+        crs = ds.crs
+    if red.size == 0:
+        return None
+    with rasterio.open(nir_url) as ds:
+        nir = ds.read(1, window=_window(ds, bbox)).astype(np.float32)
+    with rasterio.open(scl_url) as ds:
+        scl = ds.read(1, window=_window(ds, bbox))
+
+    # SCL is 20 m; repeat it to the 10 m grid and trim to match.
+    scl10 = np.repeat(np.repeat(scl, 2, axis=0), 2, axis=1)
+    h = min(red.shape[0], nir.shape[0], scl10.shape[0])
+    w = min(red.shape[1], nir.shape[1], scl10.shape[1])
+    red, nir, scl10 = red[:h, :w], nir[:h, :w], scl10[:h, :w]
+
+    bad = np.isin(scl10, SCL_CLOUD) | (scl10 == SCL_NODATA)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        ndvi = (nir - red) / (nir + red)
+    ndvi[bad] = np.nan
+    ndvi[~np.isfinite(ndvi)] = np.nan
+    return {'ndvi': ndvi, 'transform': tfm, 'crs': crs}
+
+
+def ndvi_composite(bbox, granules, max_scenes=4, min_valid=0.5):
+    """Median cloud-free NDVI over up to ``max_scenes`` granules.
+
+    Compositing rather than taking a single date matters here: a single clear
+    scene still carries that day's soil moisture and sun angle, and the whole
+    point of the comparison is to isolate a persistent change from those.
+    """
+    frames, used, meta = [], [], None
+    for date, prefix in granules:
+        if len(frames) >= max_scenes:
+            break
+        got = read_ndvi(prefix, bbox)
+        if got is None:
+            continue
+        arr = got['ndvi']
+        if np.isfinite(arr).mean() < min_valid:
+            continue
+        if meta is None:
+            meta = got
+            frames.append(arr)
+        else:
+            h = min(meta['ndvi'].shape[0], arr.shape[0])
+            w = min(meta['ndvi'].shape[1], arr.shape[1])
+            frames = [f[:h, :w] for f in frames]
+            frames.append(arr[:h, :w])
+        used.append(date)
+    if not frames:
+        return None
+    with np.errstate(invalid='ignore'):
+        comp = np.nanmedian(np.stack(frames), axis=0)
+    return {'ndvi': comp, 'transform': meta['transform'], 'crs': meta['crs'],
+            'dates': used}

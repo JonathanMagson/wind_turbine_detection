@@ -26,6 +26,8 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 
+from . import http_util
+
 BUCKET = 'https://sentinel-s1-l1c.s3.amazonaws.com'
 
 # Radius in degrees around the AOI centre for selecting tie points. Wide enough
@@ -35,8 +37,7 @@ FIT_DEGREE = 3
 
 
 def fetch(scene_path, rel, timeout=120):
-    return urllib.request.urlopen(f'{BUCKET}/{scene_path}/{rel}',
-                                  timeout=timeout).read()
+    return http_util.fetch(f'{BUCKET}/{scene_path}/{rel}', timeout=timeout)
 
 
 def _design(lat, lon, degree):

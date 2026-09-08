@@ -20,12 +20,14 @@ import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
+from . import http_util
+
 BUCKET = 'https://sentinel-s1-l1c.s3.amazonaws.com'
 REPEAT_DAYS = 12
 
 
 def _get(url, timeout=90):
-    return urllib.request.urlopen(url, timeout=timeout).read().decode()
+    return http_util.fetch_text(url, timeout=timeout)
 
 
 def relative_orbit(absolute_orbit, mission_id):
