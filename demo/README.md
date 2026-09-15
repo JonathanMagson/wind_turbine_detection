@@ -83,6 +83,11 @@ Three things the fetcher has to get right:
 Scenes land in `demo/scenes/`, which is git-ignored — the commands above
 reproduce them exactly, including the acquisition, via `--scene`.
 
+[`DATA_ACCESS.md`](DATA_ACCESS.md) covers the wider picture: where Sentinel-1
+and Sentinel-2 data come from, which endpoints an agent session can actually
+reach (public buckets yes, STAC APIs often not), and the metadata traps behind
+the three points above.
+
 ## Options
 
 ```
@@ -133,6 +138,7 @@ demo/template.html           the page itself; __TITLE__ and __PAYLOAD__ are inje
 demo/fetch_scene.py          cuts a new scene out of the public Sentinel-2 COG archive
 demo/requirements.txt        floating dependencies for a current Python
 demo/requirements-fetch.txt  extra dependencies for fetch_scene.py only
+demo/DATA_ACCESS.md          where Sentinel-1/-2 data comes from, and what blocks it
 ```
 
 The detector itself is untouched: `pipeline.py` calls
