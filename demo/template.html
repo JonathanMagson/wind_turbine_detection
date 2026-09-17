@@ -701,9 +701,10 @@ python3 -m venv .venv
     --meta example/test_meta.txt \
     --heights 60,80,100 --t-nfa 1 --serve</pre>
       <p class="note sep" style="margin-top:12px">
-        Every run also writes <code>detections.csv</code> and
-        <code>detections.geojson</code> beside the page, so the candidates drop
-        straight into QGIS.
+        Every run also writes <code>detections.csv</code>,
+        <code>detections.geojson</code> and <code>detections.kml</code> beside the
+        page, so the candidates drop straight into QGIS or Google Earth — the KML
+        banded by confidence, with the modelled shadows on a layer of their own.
       </p>
     </div>
   </section>

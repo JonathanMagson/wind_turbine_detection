@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -137,8 +138,113 @@ def render_html(payload: dict, standalone: bool) -> str:
     return HTML_SKELETON.format(fragment=fragment)
 
 
+# Confidence bands for review: one KML folder each, so a reviewer can switch
+# off the weak tail and look at the strong candidates first.
+KML_BANDS = [
+    ("Strong  (-log10 NFA >= 5)", 5.0, "ff2020e0"),   # aabbggrr: red
+    ("Medium  (3 to 5)", 3.0, "ff2080ff"),            # orange
+    ("Weak    (below 3)", -1e9, "ff40d0ff"),          # amber
+]
+
+
+def _xml(text) -> str:
+    return (str(text).replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def write_kml(payload: dict, path: str) -> None:
+    """Detections as KML, banded by confidence, for Google Earth review."""
+    sc, geo = payload["scene"], payload["geometry"]
+    sun_az, shadow_m = geo["sunAzimuth"], geo["sampling"]["shadowLengthM"]
+    dets = payload["detections"]
+
+    out = ['<?xml version="1.0" encoding="UTF-8"?>',
+           '<kml xmlns="http://www.opengis.net/kml/2.2">', "<Document>",
+           f"<name>{_xml(sc['name'])} — turbine candidates</name>", "<open>1</open>",
+           "<description><![CDATA[",
+           f"<b>{len(dets)}</b> candidates at &minus;log<sub>10</sub>(NFA) &gt; "
+           f"{payload['params']['tNFA']}<br>",
+           f"{_xml(sc['satellite'])} {_xml(sc['band'])}, tile {_xml(sc['tile'])}, "
+           f"acquired {_xml(sc['acquired'])}<br>",
+           f"Sun {geo['sunAltitude']:.1f}&deg; altitude, {sun_az:.1f}&deg; azimuth "
+           f"&mdash; a {geo['heights'][0]:.0f} m hub throws {shadow_m:.0f} m of shadow<br>",
+           f"Thresholds: shadow {payload['params']['tShadow']} DN, "
+           f"hub {payload['params']['tHub']} DN<br><br>",
+           "<i>Candidates, not verified turbines. Google Earth imagery is from a "
+           "different date and sun angle than the scene these were detected in.</i>",
+           "]]></description>"]
+
+    for _, _, colour in KML_BANDS:
+        out += [f'<Style id="c{colour}">', "<IconStyle>", f"<color>{colour}</color>",
+                "<scale>0.9</scale><Icon><href>"
+                "http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png"
+                "</href></Icon></IconStyle>",
+                f"<LabelStyle><color>{colour}</color><scale>0.7</scale></LabelStyle>",
+                f"<LineStyle><color>{colour}</color><width>2</width></LineStyle>",
+                "</Style>"]
+
+    for label, floor, colour in KML_BANDS:
+        ceiling = min((f for _, f, _ in KML_BANDS if f > floor), default=float("inf"))
+        band = [d for d in dets if floor <= d["nfa"] < ceiling]
+        if not band:
+            continue
+        out += ["<Folder>", f"<name>{_xml(label)} — {len(band)}</name>",
+                "<open>0</open>"]
+        for d in band:
+            out += ["<Placemark>", f"<name>#{d['id']}  {d['nfa']:.2f}</name>",
+                    f"<styleUrl>#c{colour}</styleUrl>",
+                    "<description><![CDATA[",
+                    f"&minus;log<sub>10</sub>(NFA) <b>{d['nfa']:.2f}</b><br>",
+                    f"{d['pixels']} pixel{'s' if d['pixels'] != 1 else ''} above the cut<br>",
+                    f"{abs(d['lat']):.6f}&deg;{'S' if d['lat'] < 0 else 'N'} "
+                    f"{abs(d['lon']):.6f}&deg;{'W' if d['lon'] < 0 else 'E'}<br>",
+                    f"UTM {_xml(sc['utmZone'])} {d['easting']:.0f}E {d['northing']:.0f}N<br>",
+                    f"scene row {d['row']}, col {d['col']}",
+                    "]]></description>",
+                    "<ExtendedData>",
+                    f'<Data name="logNFA"><value>{d["nfa"]:.3f}</value></Data>',
+                    f'<Data name="pixels"><value>{d["pixels"]}</value></Data>',
+                    f'<Data name="row"><value>{d["row"]}</value></Data>',
+                    f'<Data name="col"><value>{d["col"]}</value></Data>',
+                    "</ExtendedData>",
+                    "<Point><altitudeMode>clampToGround</altitudeMode>",
+                    f"<coordinates>{d['lon']:.7f},{d['lat']:.7f},0</coordinates>",
+                    "</Point>", "</Placemark>"]
+        out.append("</Folder>")
+
+    # The shadow the detector modelled, drawn from each candidate. Off by
+    # default: it belongs to the Sentinel-2 acquisition, not to whatever
+    # imagery Google Earth happens to show underneath.
+    bearing = math.radians((sun_az + 180.0) % 360.0)
+    out += ["<Folder>", "<name>Modelled shadow at acquisition</name>",
+            "<visibility>0</visibility><open>0</open>"]
+    for d in dets:
+        dlat = shadow_m * math.cos(bearing) / 111320.0
+        dlon = shadow_m * math.sin(bearing) / (111320.0 * math.cos(math.radians(d["lat"])))
+        out += ["<Placemark>", f"<name>#{d['id']}</name>",
+                "<styleUrl>#cff2020e0</styleUrl>", "<visibility>0</visibility>",
+                "<LineString><tessellate>1</tessellate><coordinates>",
+                f"{d['lon']:.7f},{d['lat']:.7f},0 "
+                f"{d['lon'] + dlon:.7f},{d['lat'] + dlat:.7f},0",
+                "</coordinates></LineString>", "</Placemark>"]
+    out.append("</Folder>")
+
+    c = sc["corners"]
+    ring = [c["ul"], c["ur"], c["lr"], c["ll"], c["ul"]]
+    out += ["<Placemark>", "<name>Scene footprint</name>",
+            "<Style><LineStyle><color>a0ffffff</color><width>2</width></LineStyle>",
+            "<PolyStyle><fill>0</fill></PolyStyle></Style>",
+            "<LineString><tessellate>1</tessellate><coordinates>",
+            " ".join(f"{lon:.7f},{lat:.7f},0" for lat, lon in ring),
+            "</coordinates></LineString>", "</Placemark>",
+            "</Document>", "</kml>"]
+
+    with open(path, "w") as fh:
+        fh.write("\n".join(out) + "\n")
+
+
 def write_sidecars(payload: dict, outdir: str) -> list[str]:
-    """Detections as CSV and GeoJSON, next to the HTML."""
+    """Detections as CSV, GeoJSON and KML, next to the HTML."""
     dets = payload["detections"]
     written = []
 
@@ -162,6 +268,10 @@ def write_sidecars(payload: dict, outdir: str) -> list[str]:
     with open(gj_path, "w") as fh:
         json.dump(geo, fh, indent=1)
     written.append(gj_path)
+
+    kml_path = os.path.join(outdir, "detections.kml")
+    write_kml(payload, kml_path)
+    written.append(kml_path)
     return written
 
 

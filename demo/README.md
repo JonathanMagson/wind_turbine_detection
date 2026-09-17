@@ -33,8 +33,13 @@ With `--serve`, the shadow and hub contrast thresholds (`diff_s`, `diff_h`) are
 live too: moving either slider re-runs `main_NFA` on the server (~9 s for the
 full scene) and streams a new evidence map back into the canvas.
 
-Every run also writes `detections.csv` and `detections.geojson` next to the
-page, so candidates open straight in QGIS.
+Every run also writes three sidecars next to the page:
+
+| File | For |
+| --- | --- |
+| `detections.csv` | anything — id, row/col, score, pixel count, lat/lon, UTM |
+| `detections.geojson` | QGIS and friends |
+| `detections.kml` | Google Earth: placemarks banded into strong (≥ 5), medium (3–5) and weak (< 3) folders so the tail can be switched off, each balloon carrying the score and both coordinate systems, plus the scene footprint and — on a layer that starts hidden — the shadow the detector modelled at each candidate. That shadow belongs to the Sentinel-2 acquisition, not to whatever imagery Google Earth draws underneath, which is usually a different date and sun angle. |
 
 ## Fetching a scene
 
