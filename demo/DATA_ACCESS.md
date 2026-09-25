@@ -5,6 +5,10 @@ actually run from a Claude Code session on the web on 9 Sep 2026; the rest is
 signposting. Useful beyond this repository — most of it is about which endpoints
 an agent session can actually reach, and which metadata fields lie.
 
+> A reusable version of this, which Claude Code loads automatically, lives in
+> [`.claude/skills/sentinel-data/`](../.claude/skills/sentinel-data/SKILL.md)
+> — same material, plus a working fetch script and per-mission reference files.
+
 ---
 
 ## 0. First, find out what your session can reach
