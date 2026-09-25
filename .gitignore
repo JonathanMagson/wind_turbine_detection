@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+demo/out/
+demo/out-*/
+demo/scenes/

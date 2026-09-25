@@ -12,7 +12,13 @@ This is an implementation of an algorithm for wind turbine detection on Sentinel
 optical satellite time series.  This code is part of the following publication
 and was subject to peer review:
 
-  "[[COMPLETER]"
+  Nicolas Mandroux, Tristan Dagobert, Sebastien Drouyer, and Rafael Grompone
+  von Gioi, "Single Date Wind Turbine Detection on Sentinel-2 Optical Images",
+  Image Processing On Line, 12 (2022), pp. 198-217.
+  https://doi.org/10.5201/ipol.2022.384
+
+  (Citation filled in from the published article -- the original package
+  shipped this field as an unfilled placeholder. The code is unchanged.)
 
 
 Files

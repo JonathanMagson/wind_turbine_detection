@@ -1,0 +1,4 @@
+# Extra dependencies for demo/fetch_scene.py, which pulls a Sentinel-2 window
+# out of the public AWS COG archive. Not needed to build or serve the page.
+rasterio>=1.3
+mgrs>=1.4

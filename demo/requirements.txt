@@ -1,0 +1,10 @@
+# Dependencies for the browser demo (demo/turbine_demo.py).
+# Unlike the pinned root requirements.txt, these float: the demo is meant to
+# install cleanly on a current Python.
+numpy>=1.21
+scipy>=1.7
+tifffile>=2021.11.2
+imagecodecs>=2021.8.26
+utm>=0.7.0
+pysolar>=0.9
+pillow>=9.0
